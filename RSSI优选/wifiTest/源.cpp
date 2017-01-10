@@ -13,6 +13,7 @@ using namespace std;
 #define ProbeNum 2 //表示一共有几个探针返回数据
 #define SERVER_PORT 2222 
 #define BUFFER_SIZE 1024 
+#define THD -80
 
 class Probe
 {
@@ -60,6 +61,7 @@ public:
 	WSADATA wsd;//WSADATA 变量
 	SOCKET s;//嵌套字
 	FILE *fp1,*fp2;
+	//FILE	*fp3;
 	sockaddr_in servAddr;//服务器地址
 	sockaddr_in clientAddr; 
 	unsigned char zeroMac[6];
@@ -95,6 +97,7 @@ Probe::~Probe()
 	::WSACleanup();
 	fclose(fp1);
 	fclose(fp2);
+	//fclose(fp3);
 	exit(0);
 }
 
@@ -124,6 +127,7 @@ void Probe::InitProbe()
 	}
 	fp1=fopen("probe1.csv","a+");
 	fp2=fopen("probe2.csv","a+");
+	//fp3=fopen("prb2.csv","a+");
 }
 
 
@@ -234,21 +238,33 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//进行同一时间的RSSI优选,
 		}
 	}
 	else //当时间不一致的时候要输出数据，并且要把第一个不同的数据存下来，并且将时间记录下来
-	{//输出数据到文件	
+	{//输出数据到文件
+		//添加一个触发条件，即时间间隔必须为一秒
+
+		//
 		if(flag[index]==true)//必须先存到数据才执行写数据
 		{
+			//给数据加入一个Buffer，可以对数据进行筛选，不用全部存，只要把MAC存入应该就行
+
+			//
 			for(int j=0;j<indexForPure[index];j++)//使用这个索引号减少运算
 			{
+				//加入为空的判断
+
+				//
 				for (int ii=0;ii<14;ii++) 
 				{
-					fprintf(f,"%c", time[ii]);
+					fprintf(f,"%c", timeTemp[index][ii]);
 				}
 				fprintf(f,",");
-				fprintf(f,"%d,", sel[index][j].maxRssi);
-				fprintf(f,"%02X:%02X:%02X:%02X:%02X:%02X", sel[index][j].selMumac[0], sel[index][j].selMumac[1], sel[index][j].selMumac[2], \
+				fprintf(f,"%02X:%02X:%02X:%02X:%02X:%02X,", sel[index][j].selMumac[0], sel[index][j].selMumac[1], sel[index][j].selMumac[2], \
 					sel[index][j].selMumac[3], sel[index][j].selMumac[4], sel[index][j].selMumac[5]);
+				fprintf(f,"%d", sel[index][j].maxRssi);
 				fprintf(f,"\n");
 			}
+			//将数据存入buffer中
+
+			//
 			flag[index]=false;//重新置为否，只运行一次
 			memset(&sel[index],0,sizeof(rssiTemp)*sameTimeMacNum);//将结构体重置为零
 			indexForPure[index]=0;//重置
@@ -283,6 +299,8 @@ void Probe::probeProcess()
 		packageData = (struct cliprobeData *) buffer;//格式化数据 
 		char retime[14];
 		probeTimeFix(packageData->Timestamp,retime);//修复时间戳格式，使其变成14位
+		if(int(packageData->Rssi)>THD){
+			//应该在外面完成数据的统一合并
 		if(addr[10]=='1')//定义的是地址
 		{
 			//for (int i=0;i<14;i++) 
@@ -298,16 +316,17 @@ void Probe::probeProcess()
 		}
 		else if(addr[10]=='2')
 		{
-			//for (int i=0;i<14;i++)
-			//{
-			//	fprintf(fp2,"%c", retime[i]);
-			//}
-			//fprintf(fp2,",");
-			//fprintf(fp2,"%d,", packageData->Rssi);
-			//fprintf(fp2,"%02X:%02X:%02X:%02X:%02X:%02X", packageData->Mumac[0], packageData->Mumac[1], packageData->Mumac[2], \
-			//	packageData->Mumac[3], packageData->Mumac[4], packageData->Mumac[5]);
-			//fprintf(fp2,"\n");
+			/*for (int i=0;i<14;i++)
+			{
+				fprintf(fp3,"%c", retime[i]);
+			}
+			fprintf(fp3,",");
+			fprintf(fp3,"%d,", packageData->Rssi);
+			fprintf(fp3,"%02X:%02X:%02X:%02X:%02X:%02X", packageData->Mumac[0], packageData->Mumac[1], packageData->Mumac[2], \
+				packageData->Mumac[3], packageData->Mumac[4], packageData->Mumac[5]);
+			fprintf(fp3,"\n");*/
 			rssiPurify(retime,fp2,1);
+		}
 		}
 }
 
