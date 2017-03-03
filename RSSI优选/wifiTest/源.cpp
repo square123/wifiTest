@@ -418,22 +418,18 @@ void Probe::probeProcess()
 		
 		if(addr[10]=='1')//定义的是地址
 		{
-			//printf("%s\n",ipaddr);		//显示接收信号的地址
-
 			rssiPurify(retime,fp1,0);
 		}
 		else if(addr[10]=='2')
 		{
-			//printf("%s\n",ipaddr);		//显示接收信号的地址
-
 			rssiPurify(retime,fp2,1);
 		}
 		
 		for (int mm=0;mm<ProbeNum;mm++)//必须要让两个都存储完///！！！！！！！！！！！！！！！！！！需要验证，寒假回来再说
 		{
-			enable=enable&saveFinshFlag[mm];
+			enable=enable&&saveFinshFlag[mm];
 		}
-		if ((syscTime<charToTimeInt(retime))&enable)//输出时间不同时，将标志位保存下
+		if ((syscTime<charToTimeInt(retime))&&enable)//输出时间不同时，将标志位保存下
 		{
 			syscTime=charToTimeInt(retime);
 
@@ -462,7 +458,7 @@ void Probe::probeProcess()
 	}
 }
 		
-void Probe::probeSysc(int baseIndex,FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中
+void Probe::probeSysc(int baseIndex,FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数据有丢失，是因为考虑的不够周全，并没有完全解决同步的问题，之前的一些确实是有bug
 {
 	//初始化部分
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//用于多探针集合表格式，清空
