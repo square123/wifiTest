@@ -130,7 +130,7 @@ Probe::Probe()
 		memset(timeTemp[i],0,sizeof(char)*14);// ±º‰≥ı ºªØ
 		indexForPure[i]=0;//À˜“˝≥ı ºªØ
 		flag[i]=false;//±Í÷æŒª≥ı ºªØ
-		saveFinshFlag[i]=false;//¥Ê¥¢±Í÷æŒª≥ı ºªØ
+		saveFinshFlag[i]=0;//¥Ê¥¢±Í÷æŒª≥ı ºªØ
 		//for (int j=0;j<3;j++)//Õ¨≤Ω¥Ê¥¢±‰¡ø≥ı ºªØ
 		//{
 		//	memset(&syscStr[j][i],0,sizeof(syscProbe)*sameTimeMacNum);
@@ -313,6 +313,7 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//Ω¯––Õ¨“ª ±º‰µƒRSSI”≈—°,
 			{
 				//∏¯ ˝æ›º”»Î“ª∏ˆBuffer£¨ø…“‘∂‘ ˝æ›Ω¯––…∏—°£¨≤ª”√»´≤ø¥Ê£¨÷ª“™∞—MAC¥Ê»Î”¶∏√æÕ––
 				//ÃÌº”“ª∏ˆ¥•∑¢Ãıº˛£¨º¥ ±º‰º‰∏Ù±ÿ–ÎŒ™“ª√Î£¨≤≈Ω¯–– «∑Ò÷ÿ∏¥µƒ≈–∂œ
+				//ºı…Ÿ¡⁄√Î ‰≥ˆµƒ≈–∂œ≤ø∑÷
 				if (douflag)//“—æ≠≥ˆœ÷µƒMac¬Î≤ª‘Ÿ‘⁄µ⁄∂˛√Î ‰≥ˆ£¨∫Û√Êµƒ ˝æ›≤ªπ‹¡À£¨“ÚŒ™“—æ≠ ‰≥ˆ¡À
 				{
 					bool skipflag=false;
@@ -354,7 +355,7 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//Ω¯––Õ¨“ª ±º‰µƒRSSI”≈—°,
 			flag[index]=false;//÷ÿ–¬÷√Œ™∑Ò£¨÷ª‘À––“ª¥Œ
 			memset(sel[index],0,sizeof(rssiTemp)*sameTimeMacNum);//Ω´Ω·ππÃÂ÷ÿ÷√Œ™¡„
 			indexForPure[index]=0;//÷ÿ÷√
-			saveFinshFlag[index]=true;
+			saveFinshFlag[index]=1;
 		}
 		//≤ªº”’‚∏ˆæÕ∞—µ⁄“ª∏ˆ ˝æ›∏¯¬©µÙ¡À,≤¢«“µ± ˝æ›∑¢…˙±‰ªØ ‰≥ˆµΩŒƒº˛“≤ª·∂™µÙ ˝æ›	
 		memcpy(sel[index][0].selMumac,packageData->Mumac,sizeof(unsigned char)*6);
@@ -367,6 +368,7 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//Ω¯––Õ¨“ª ±º‰µƒRSSI”≈—°,
 
 void Probe::probeProcess()
 {
+	//socketÕ®–≈∞Û∂®≤ø∑÷
 	bool enable=true;
 	int clientAddrLength = sizeof(clientAddr); 
 	char buffer[BUFFER_SIZE];
@@ -424,7 +426,7 @@ void Probe::probeProcess()
 		{
 			rssiPurify(retime,fp2,1);
 		}
-		
+		//∏√≤ø∑÷‘› ±√ª”√
 		for (int mm=0;mm<ProbeNum;mm++)//±ÿ–Î“™»√¡Ω∏ˆ∂º¥Ê¥¢ÕÍ///£°£°£°£°£°£°£°£°£°£°£°£°£°£°£°£°£°£°–Ë“™—È÷§£¨∫ÆºŸªÿ¿¥‘ŸÀµ
 		{
 			enable=enable&&saveFinshFlag[mm];
@@ -450,7 +452,12 @@ void Probe::probeProcess()
 			}
 			printf("\n");
 			memcpy(timePool[storeIndex],retime,sizeof(char)*14);*/
-			probeSysc(0,fpSysc);//¥¶¿Ì∫Ø ˝
+			probeSysc(0,fpSysc);//Õ¨≤Ω¥¶¿Ì∫Ø ˝
+			for (int mm=0;mm<ProbeNum;mm++)//¥¶¿ÌÕÍ∫Û÷ÿ–¬÷√0///∏–æıªπ «”–Œ Ã‚~~~~ª·≥ˆœ÷ ˝æ›¥Û√Êª˝∂™ ßµƒŒ Ã‚£¨”¶∏√ªπ–Ë“™–ﬁ∏ƒ£¨–ﬁ∏ƒ‘⁄breakµÿ∑Ω…œ£¨ªÚ’ﬂ¡Ω∏ˆ ±º‰”Úµƒ≈–∂œ…œ
+			{
+				saveFinshFlag[mm]=0;
+			}
+			enable=1;//÷ÿ–¬÷ÿ÷√
 			storeIndex=(storeIndex+1)%3;//¥Ê¥¢À˜“˝º”1
 			processIndex=(processIndex+1)%3;//¥¶¿ÌÀ˜“˝º”1
 			
@@ -458,12 +465,14 @@ void Probe::probeProcess()
 	}
 }
 		
-void Probe::probeSysc(int baseIndex,FILE *f)//ÃΩ’ÎÕ¨≤Ω∫Ø ˝,Ω´Õ¨≤Ω∫Ûµƒ ˝æ›¥Ê¥¢µΩ“ª∏ˆ–¬µƒ±Ì÷–  ˝æ›”–∂™ ß£¨ «“ÚŒ™øº¬«µƒ≤ªπª÷‹»´£¨≤¢√ª”–ÕÍ»´Ω‚æˆÕ¨≤ΩµƒŒ Ã‚£¨÷Æ«∞µƒ“ª–©»∑ µ «”–bug
+void Probe::probeSysc(int baseIndex,FILE *f)//ÃΩ’ÎÕ¨≤Ω∫Ø ˝,Ω´Õ¨≤Ω∫Ûµƒ ˝æ›¥Ê¥¢µΩ“ª∏ˆ–¬µƒ±Ì÷–  ˝æ›”–∂™ ß‘ı√¥Ω‚æˆ£ø£ø£ø
 {
 	//≥ı ºªØ≤ø∑÷
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//”√”⁄∂‡ÃΩ’ÎºØ∫œ±Ì∏Ò Ω£¨«Âø’
-	syscProbe syscStrEd[3][ProbeNum][sameTimeMacNum];//”√”⁄¥Ê¥¢ΩÙ¥’∫Ûµƒ±‰¡ø
-	memset(syscStrEd,0,(sizeof(syscProbe)*3*ProbeNum*sameTimeMacNum));//«Âø’
+
+	syscProbe syscStrEd[3][ProbeNum][sameTimeMacNum];//∂®“Â”√”⁄¥Ê¥¢ΩÙ¥’∫Ûµƒ±‰¡ø
+	memset(syscStrEd,0,(sizeof(syscProbe)*3*ProbeNum*sameTimeMacNum));//«Âø’&≥ı ºªØ
+
 	AllreduceSyscProbe(syscStr,syscStrEd);//Õ®π˝∏√∫Ø ˝Ω´ ˝æ›ΩÙ¥’“ª–©
 	int jianshao=0;
 	//≈–∂œ≤ø∑÷
@@ -484,7 +493,7 @@ void Probe::probeSysc(int baseIndex,FILE *f)//ÃΩ’ÎÕ¨≤Ω∫Ø ˝,Ω´Õ¨≤Ω∫Ûµƒ ˝æ›¥Ê¥¢µΩ“
 			{
 				continue;
 			}	
-			for (int k=0;k<3;k++)//±È¿˙ ±º‰,’‚¿Ô◊ˆ¡À“ªµ„–°∏ƒ∂Ø£¨œ£Õ˚¥”◊Ó–°µƒ ±º‰ø™ ºº«¬º°£æÕΩ´k±‰≥…((processIndex+2+k)%3)£¨ƒ¨»œ◊Óœ»µΩµƒ◊Ó∫√°¢°¢°¢°¢°¢£°£°£°£°–Ë“™—È÷§
+			for (int k=0;k<3;k++)//±È¿˙ ±º‰,’‚¿Ô◊ˆ¡À“ªµ„–°∏ƒ∂Ø£¨œ£Õ˚¥”◊Ó‘Áµƒ ±º‰ø™ ºº«¬º°£æÕΩ´k±‰≥…((processIndex+2+k)%3)£¨ƒ¨»œ◊Óœ»µΩµƒ◊Ó∫√°¢°¢°¢°¢°¢£°£°£°£°–Ë“™—È÷§
 			{	
 				bool skip=false;
 				if (!(timeCompare(syscStrEd[((processIndex+2+k)%3)][n][0].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1)))//µ± ±º‰≤ª∫œ∏Ò ±£¨÷±Ω”Ã¯≥ˆ,“ÚŒ™“ªøÈµƒ ±º‰ «œ‡Õ¨µƒ£¨À˘“‘”√0æÕø…“‘
@@ -497,11 +506,11 @@ void Probe::probeSysc(int baseIndex,FILE *f)//ÃΩ’ÎÕ¨≤Ω∫Ø ˝,Ω´Õ¨≤Ω∫Ûµƒ ˝æ›¥Ê¥¢µΩ“
 					{
 						break;//“ÚŒ™“—æ≠»√ ˝æ›ΩÙ¥’¡À£¨À˘“‘ø…“‘÷±Ω” π”√break
 					}
-					if(memcmp(syscStrEd[processIndex][baseIndex][m].selMumac,syscStrEd[((processIndex+2+k)%3)][n][l].selMumac,sizeof(unsigned char)*6)==0)//»Áπ˚∆•≈‰æÕ∞— ±º‰µº»Î
+					if(memcmp(syscStrEd[processIndex][baseIndex][m].selMumac,syscStrEd[((processIndex+2+k)%3)][n][l].selMumac,sizeof(unsigned char)*6)==0)//»Áπ˚∆•≈‰æÕ∞—RSSI÷µµº»Î
 					{
 						syscResult[m].Rssi[n]=syscStrEd[((processIndex+2+k)%3)][n][l].Rssi;
-						break;
 						skip=true;
+						break;
 					}
 				}
 				if (skip)//ºı…Ÿ‘ÀÀ„¡ø£¨“™ «ºÏ≤‚µΩ“ª∏ˆ÷µ£¨æÕ÷±Ω”Ã¯≥ˆ’‚∏ˆ ±º‰
@@ -515,10 +524,10 @@ void Probe::probeSysc(int baseIndex,FILE *f)//ÃΩ’ÎÕ¨≤Ω∫Ø ˝,Ω´Õ¨≤Ω∫Ûµƒ ˝æ›¥Ê¥¢µΩ“
 	for (int q=0;q<jianshao;q++)
 	{
 		bool outflag=1;
-		outflag=outflag&memcmp(syscResult[q].selMumac,zeroMac,sizeof(unsigned char)*6);//”–“ª∏ˆæÕ∫√
+		outflag=outflag&&memcmp(syscResult[q].selMumac,zeroMac,sizeof(unsigned char)*6);//”–“ª∏ˆæÕ∫√
 		for (int r=0;r<ProbeNum;r++)
 		{
-			outflag=outflag&memcmp(&syscResult[q].Rssi[r],&zeroRssi,sizeof(char));
+			outflag=outflag&&memcmp(&syscResult[q].Rssi[r],&zeroRssi,sizeof(char));
 		}
 		if(outflag)
 		{
@@ -625,10 +634,10 @@ void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[same
 	{
 		if (memcmp(&zeroSysc,&sysc[i],sizeof(syscProbe))!=0)//»Áπ˚≤ªŒ™ø’£¨æÕ±£¥Ê‘⁄–¬µƒ ˝æ›ºØ∫œ÷–
 		{
-			/*memcpy(sysced[j],sysc[i],sizeof(syscProbe));*///’‚æ‰–¥µƒ≤ª∂‘£¨≤ªƒ‹»°µÿ÷∑
-			memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
-			memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
-			sysced[j].Rssi=sysc[i].Rssi;
+			memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//’‚æ‰–¥µƒ≤ª∂‘£¨≤ªƒ‹»°µÿ÷∑
+			//memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
+			//memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
+			//sysced[j].Rssi=sysc[i].Rssi;
 			j++;
 		}
 	}
@@ -659,4 +668,7 @@ int main(int argc,char*argv[])
 	}  
 }
 
-//memset,memcpy.memcmp,bug◊‹Ω·£¨ ˝◊È¿‡µƒø…“‘≤ª»°µÿ÷∑£¨∑« ˝◊È¿‡£¨Ω·ππÃÂ±ÿ–Î“™»°µÿ÷∑
+//memset,memcpy.memcmp,bug◊‹Ω·£¨ ˝◊È¿‡µƒø…“‘≤ª»°µÿ÷∑£¨“ÚŒ™ ˝◊È±æ…ÌæÕ «÷∏’Î£¨ø…“‘¥´µ›£¨∑« ˝◊È¿‡£¨Ω·ππÃÂ±ÿ–Î“™»°µÿ÷∑£¨≤≈ƒ‹Ω¯––µÿ÷∑¥´µ›
+
+
+//µ» ˝æ›◊Ó÷’∫œ¿Ì∫Û£¨≤¢«“∞—C++÷ÿ–¬π˝“ª±È∫Û£¨“ª∂®“™≥È ±º‰∞—≥Ã–Ú÷ÿ–¬–¥“ª±È£¨ºı…Ÿ ˝◊Èµƒ π”√°£
