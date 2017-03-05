@@ -411,19 +411,23 @@ void Probe::probeProcess()
 
 	if(int(packageData->Rssi)>THD)//测试下阈值比较合适
 	{	
-		for (int ii=0;ii<14;ii++) 
+	/*	for (int ii=0;ii<14;ii++) 
 		{
 			printf("%c", retime[ii]);
 		}
-		printf("\n");
+		printf("\n");*/
+		cout<<charToTimeInt(retime)<<endl;
 		//应该在外面完成数据的统一合并
 		
 		if(addr[10]=='1')//定义的是地址
 		{
+			cout<<"探针1的数据"<<endl;
 			rssiPurify(retime,fp1,0);
 		}
 		else if(addr[10]=='2')
 		{
+			
+			cout<<"探针2的数据"<<endl;
 			rssiPurify(retime,fp2,1);
 		}
 		//该部分暂时没用
@@ -431,10 +435,10 @@ void Probe::probeProcess()
 		{
 			enable=enable&&saveFinshFlag[mm];
 		}
-		if ((syscTime<charToTimeInt(retime))&&enable)//输出时间不同时，将标志位保存下
+		if (enable)//输出时间不同时，将标志位保存下(syscTime<charToTimeInt(retime))&&
 		{
 			syscTime=charToTimeInt(retime);
-
+			cout<<"同步了因为"<<syscTime<<endl;
 			/*	printf("要同步的时间池: ");
 			for (int man=0;man<3;man++)
 			{
@@ -634,10 +638,10 @@ void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[same
 	{
 		if (memcmp(&zeroSysc,&sysc[i],sizeof(syscProbe))!=0)//如果不为空，就保存在新的数据集合中
 		{
-			memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//这句写的不对，不能取地址
-			//memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
-			//memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
-			//sysced[j].Rssi=sysc[i].Rssi;
+			//memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//这句写的不对，不能取地址
+			memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
+			memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
+			sysced[j].Rssi=sysc[i].Rssi;
 			j++;
 		}
 	}
