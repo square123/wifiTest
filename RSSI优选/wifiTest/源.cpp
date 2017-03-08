@@ -15,7 +15,8 @@ using namespace std;
 #define SERVER_PORT 2222 
 #define BUFFER_SIZE 1024 
 #define THD -80
-#define buffNum 3
+#define buffNum 7
+#define baseIndex 0
 
 class Probe
 {
@@ -69,7 +70,7 @@ public:
 	void probeProcess();
 	void probeTimeFix(char src[],char dst[14] );//ÓÃÀ´´æ´¢ĞŞ¸´ºóµÄÊ±¼äÊı¾İ¸ñÊ½£¬¸ù¾İÏµÍ³Ê±¼äÀ´Íê³ÉĞŞÕı£¬Òò´ËĞèÒªÔÚÊ¹ÓÃÊ±ÒªÍ¬²½
 	void rssiPurify(char time[14],FILE *f,int index);//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡
-	void probeSysc(int baseIndex,FILE *f);//´¦ÀíÍ¬²½½á¹¹ÌåµÄº¯Êı
+	void probeSysc(FILE *f);//´¦ÀíÍ¬²½½á¹¹ÌåµÄº¯Êı
 	char MaxRssi(char rssi1,char rssi2);//·µ»Ø½Ï´óµÄRSSIÖµ£¬ÇÒ¸ÃÖµ²»ÄÜÄÜµÈÓÚ0
 	bool timeCompare(char time1[14],char time2[],int delta);//·µ»ØÊ±¼äÁ½¸öÊ±¼äÊÇ·ñÏà²îdeltaÃë
 	time_t charToTimeInt(char ttt[14]);//×Ö·û´®×ª»»³ÉÊ±¼äint
@@ -116,7 +117,7 @@ private:
 Probe::Probe()
 {
 	storeIndex=0;//Òª¸üĞÂµÄÊı¾İ´æ´¢Ë÷Òı£¬Ö±½Ó´ÓË÷Òı0¿ªÊ¼´æ´¢
-	processIndex=2;//ÒªÊ¹»ù×¼×éµÄË÷ÒıºÅ£¬´Ó2¿ªÊ¼
+	processIndex=4;//ÒªÊ¹»ù×¼×éµÄË÷ÒıºÅ£¬´Ó2¿ªÊ¼
 	memset(zeroMac,0,sizeof(unsigned char)*6);//¶¨ÒåÒ»¸öÈ«ÎªÁãµÄmacÂëÁ¿
 	memset(zeroTimestamp,0,sizeof(char)*14);//¶¨ÒåÒ»¸öÈ«ÎªÁãµÄÊ±¼ä´Á
 	//memset(&zeroRssi,0,sizeof(char));//¶¨ÒåÒ»¸öÈ«ÎªÁãµÄRSSI
@@ -370,7 +371,7 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,
 void Probe::probeProcess()
 {
 	//socketÍ¨ĞÅ°ó¶¨²¿·Ö
-	bool enable=true;
+	//bool enable=true;
 	int clientAddrLength = sizeof(clientAddr); 
 	char buffer[BUFFER_SIZE];
 	ZeroMemory(buffer, BUFFER_SIZE); 
@@ -432,11 +433,11 @@ void Probe::probeProcess()
 			rssiPurify(retime,fp2,1);
 		}
 		//¸Ã²¿·ÖÔİÊ±Ã»ÓÃ
-		for (int mm=0;mm<ProbeNum;mm++)//±ØĞëÒªÈÃÁ½¸ö¶¼´æ´¢Íê///£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡£¡ĞèÒªÑéÖ¤£¬º®¼Ù»ØÀ´ÔÙËµ
-		{
-			enable=enable&&saveFinshFlag[mm];
-		}
-		if (enable)//Êä³öÊ±¼ä²»Í¬Ê±£¬½«±êÖ¾Î»±£´æÏÂ(syscTime<charToTimeInt(retime))&&
+		//for (int mm=0;mm<ProbeNum;mm++)//±ØĞëÒªÈÃÁ½¸ö¶¼´æ´¢Íê///Õâ¸ö´æÔÚÒ»¸ö´íÎó£¬»áÒòÎªÒ»¸öÌ½ÕëÁ¬Ğø´æ´¢Á½´Î£¬¶øÊı¾İ»áÒò´Ë¶ªÊ§¡£ĞŞ¸ÄÈçÏÂ£º
+		//{                                                     //ÏÖ½«Ì½ÕëµÄ´æÍêµÄ±êÊ¶£¬¸ÃÎªÖ»ÓĞÖ÷Ë÷ÒıµÄ±êÊ¶£¬Ö»Òª´æÍê¼´¿É£¬ÔÚ´æ´¢Ê±Ö»Ç¿µ÷baseIndexÌ½ÕëµÄ´¢´æ°´×é£¬¶ø·ÇË÷ÒıÌø¹ıÊ±¼ä£¬Ö»°´ÕÕÖ®Ç°µÄ´æ´¢¡£
+		//	enable=enable&&saveFinshFlag[mm];                 //»¹ÒªÑéÖ¤ÊÇ²»ÊÇ´Ó´¦ÀíË÷Òı¿ªÊ¼µÄ¡£
+		//}
+		if (saveFinshFlag[baseIndex])//Êä³öÊ±¼ä²»Í¬Ê±£¬½«±êÖ¾Î»±£´æÏÂ(syscTime<charToTimeInt(retime))&&
 		{
 			syscTime=charToTimeInt(retime);
 			cout<<"Í¬²½ÁËÒòÎª"<<syscTime<<endl;
@@ -457,12 +458,12 @@ void Probe::probeProcess()
 			}
 			printf("\n");
 			memcpy(timePool[storeIndex],retime,sizeof(char)*14);*/
-			probeSysc(0,fpSysc);//Í¬²½´¦Àíº¯Êı
-			for (int mm=0;mm<ProbeNum;mm++)//´¦ÀíÍêºóÖØĞÂÖÃ0///¸Ğ¾õ»¹ÊÇÓĞÎÊÌâ~~~~»á³öÏÖÊı¾İ´óÃæ»ı¶ªÊ§µÄÎÊÌâ£¬Ó¦¸Ã»¹ĞèÒªĞŞ¸Ä£¬ĞŞ¸ÄÔÚbreakµØ·½ÉÏ£¬»òÕßÁ½¸öÊ±¼äÓòµÄÅĞ¶ÏÉÏ
-			{
-				saveFinshFlag[mm]=0;
-			}
-			enable=1;//ÖØĞÂÖØÖÃ
+			probeSysc(fpSysc);//Í¬²½´¦Àíº¯Êı
+			//for (int mm=0;mm<ProbeNum;mm++)//´¦ÀíÍêºóÖØĞÂÖÃ0///¸Ğ¾õ»¹ÊÇÓĞÎÊÌâ~~~~»á³öÏÖÊı¾İ´óÃæ»ı¶ªÊ§µÄÎÊÌâ£¬Ó¦¸Ã»¹ĞèÒªĞŞ¸Ä£¬ĞŞ¸ÄÔÚbreakµØ·½ÉÏ£¬»òÕßÁ½¸öÊ±¼äÓòµÄÅĞ¶ÏÉÏ
+			//{
+			saveFinshFlag[baseIndex]=0;
+	/*		}*/
+			//enable=1;//ÖØĞÂÖØÖÃ
 			storeIndex=(storeIndex+1)%buffNum;//´æ´¢Ë÷Òı¼Ó1
 			processIndex=(processIndex+1)%buffNum;//´¦ÀíË÷Òı¼Ó1
 			
@@ -470,7 +471,7 @@ void Probe::probeProcess()
 	}
 }
 		
-void Probe::probeSysc(int baseIndex,FILE *f)//Ì½ÕëÍ¬²½º¯Êı,½«Í¬²½ºóµÄÊı¾İ´æ´¢µ½Ò»¸öĞÂµÄ±íÖĞ Êı¾İÓĞ¶ªÊ§ÔõÃ´½â¾ö£¿£¿£¿
+void Probe::probeSysc(FILE *f)//Ì½ÕëÍ¬²½º¯Êı,½«Í¬²½ºóµÄÊı¾İ´æ´¢µ½Ò»¸öĞÂµÄ±íÖĞ Êı¾İÓĞ¶ªÊ§ÔõÃ´½â¾ö£¿£¿£¿
 {
 	//³õÊ¼»¯²¿·Ö
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//ÓÃÓÚ¶àÌ½Õë¼¯ºÏ±í¸ñÊ½£¬Çå¿Õ
@@ -487,7 +488,7 @@ void Probe::probeSysc(int baseIndex,FILE *f)//Ì½ÕëÍ¬²½º¯Êı,½«Í¬²½ºóµÄÊı¾İ´æ´¢µ½Ò
 		{
 			break;
 		}	
-		jianshao++;
+		++jianshao;
 		//ÏÈ°Ñ±äÁ¿´æÏÂÀ´
 		memcpy(syscResult[m].Timestamp,syscStrEd[processIndex][baseIndex][m].Timestamp,sizeof(char)*14);
 		memcpy(syscResult[m].selMumac,syscStrEd[processIndex][baseIndex][m].selMumac,sizeof(unsigned char)*6);
@@ -498,24 +499,27 @@ void Probe::probeSysc(int baseIndex,FILE *f)//Ì½ÕëÍ¬²½º¯Êı,½«Í¬²½ºóµÄÊı¾İ´æ´¢µ½Ò
 			{
 				continue;
 			}	
-			for (int k=0;k<5;k++)//±éÀúÊ±¼ä,ÕâÀï×öÁËÒ»µãĞ¡¸Ä¶¯£¬Ï£Íû´Ó×îÔçµÄÊ±¼ä¿ªÊ¼¼ÇÂ¼¡£¾Í½«k±ä³É((processIndex+2+k)%3)£¬Ä¬ÈÏ×îÏÈµ½µÄ×îºÃ¡¢¡¢¡¢¡¢¡¢£¡£¡£¡£¡ĞèÒªÑéÖ¤
+			for (int k=0;k<buffNum;k++)//±éÀúÊ±¼ä,ÕâÀï×öÁËÒ»µãĞ¡¸Ä¶¯£¬Ï£Íû´Ó×îÔçµÄÊ±¼ä¿ªÊ¼¼ÇÂ¼¡£¾Í½«k±ä³É((processIndex+2+k)%3)£¬Ä¬ÈÏ×îÏÈµ½µÄ×îºÃ¡¢¡¢¡¢¡¢¡¢£¡£¡£¡£¡ĞèÒªÑéÖ¤
 			{	
-				bool skip=false;
-				if (!(timeCompare(syscStrEd[((processIndex+2+k)%buffNum)][n][0].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1)))//µ±Ê±¼ä²»ºÏ¸ñÊ±£¬Ö±½ÓÌø³ö,ÒòÎªÒ»¿éµÄÊ±¼äÊÇÏàÍ¬µÄ£¬ËùÒÔÓÃ0¾Í¿ÉÒÔ
-				{
-					continue;//Í¨¹ı¸ÃÅĞ¶ÏÈ¥³ıÊ±¼ä²»ºÏ¸ñµÄ±äÁ¿
-				}
+				bool skip=0;
+				//if (!(timeCompare(syscStrEd[((processIndex+2+k)%buffNum)][n][0].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1)))//µ±Ê±¼ä²»ºÏ¸ñÊ±£¬Ö±½ÓÌø³ö,ÒòÎªÒ»¿éµÄÊ±¼äÊÇÏàÍ¬µÄ£¬ËùÒÔÓÃ0¾Í¿ÉÒÔ
+				//{
+				//	continue;//Í¨¹ı¸ÃÅĞ¶ÏÈ¥³ıÊ±¼ä²»ºÏ¸ñµÄ±äÁ¿
+				//}
 				for (int l=0;l<sameTimeMacNum;l++)//±éÀúÒ»¸öÊ±¼ä¿éÏÂ, l±íÊ¾¿éÄÚ´æ´¢Ë÷Òı
 				{	
-					if (memcmp(&syscStrEd[((processIndex+2+k)%buffNum)][n][l],&zeroSysc,sizeof(syscProbe))==0)
+					if (memcmp(&syscStrEd[k][n][l],&zeroSysc,sizeof(syscProbe))==0)
 					{
 						break;//ÒòÎªÒÑ¾­ÈÃÊı¾İ½ô´ÕÁË£¬ËùÒÔ¿ÉÒÔÖ±½ÓÊ¹ÓÃbreak
 					}
-					if(memcmp(syscStrEd[processIndex][baseIndex][m].selMumac,syscStrEd[((processIndex+2+k)%buffNum)][n][l].selMumac,sizeof(unsigned char)*6)==0)//Èç¹ûÆ¥Åä¾Í°ÑRSSIÖµµ¼Èë
+					if(memcmp(syscStrEd[processIndex][baseIndex][m].selMumac,syscStrEd[k][n][l].selMumac,sizeof(unsigned char)*6)==0)//Èç¹ûÆ¥Åä¾Í°ÑRSSIÖµµ¼Èë
 					{
-						syscResult[m].Rssi[n]=syscStrEd[((processIndex+2+k)%buffNum)][n][l].Rssi;
-						skip=true;
-						break;
+						if (timeCompare(syscStrEd[k][n][l].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1))
+						{
+							syscResult[m].Rssi[n]=syscStrEd[k][n][l].Rssi;
+						    skip=1;
+						    break;
+						}
 					}
 				}
 				if (skip)//¼õÉÙÔËËãÁ¿£¬ÒªÊÇ¼ì²âµ½Ò»¸öÖµ£¬¾ÍÖ±½ÓÌø³öÕâ¸öÊ±¼ä
@@ -526,7 +530,7 @@ void Probe::probeSysc(int baseIndex,FILE *f)//Ì½ÕëÍ¬²½º¯Êı,½«Í¬²½ºóµÄÊı¾İ´æ´¢µ½Ò
 		}
 	}
 	//Êä³ö²¿·Ö£¬¼ì²â¾ùÓĞÖµ²ÅÊä³ö
-	for (int q=0;q<jianshao;q++)
+	for (int q=0;q<jianshao;++q)
 	{
 		bool outflag=1;
 		outflag=outflag&&memcmp(syscResult[q].selMumac,zeroMac,sizeof(unsigned char)*6);//ÓĞÒ»¸ö¾ÍºÃ
