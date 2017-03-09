@@ -15,7 +15,7 @@ using namespace std;
 #define SERVER_PORT 2222 
 #define BUFFER_SIZE 1024 
 #define THD -80
-#define buffNum 7
+#define buffNum 3
 #define baseIndex 0
 
 class Probe
@@ -74,6 +74,7 @@ public:
 	char MaxRssi(char rssi1,char rssi2);//返回较大的RSSI值，且该值不能能等于0
 	bool timeCompare(char time1[14],char time2[],int delta);//返回时间两个时间是否相差delta秒
 	time_t charToTimeInt(char ttt[14]);//字符串转换成时间int
+	int charTimeGetSecond(char ttt[14]);//获取时间的后两位并转换成int型
 	struct syscProbed
 	{
 		char Timestamp[14];
@@ -100,43 +101,39 @@ private:
 	time_t syscTime;	//系统时间
 	int storeIndex;//存储数据的索引
 	int processIndex;//处理同步的索引
-	bool saveFinshFlag[ProbeNum];
-	struct syscProbe	//同步多探针的结构体	
+	//bool saveFinshFlag[ProbeNum];
+	struct syscProbe	//同步多探针的结构体	配合baseIndex的要完成同步的数据，这里直接改成60，按秒取余存取，虽然浪费了空间但节约了时间，提高了鲁棒性
 	{
 		char Timestamp[14];
 		unsigned char selMumac[6];
 		char Rssi;
-	}syscStr[buffNum][ProbeNum][sameTimeMacNum];//三维结构体数组，要寄存的时间、探针数量、每秒钟存储的数据，3代表缓冲池的放的数据
+	}syscStr[60][ProbeNum][sameTimeMacNum];//三维结构体数组，要寄存的时间、探针数量、每秒钟存储的数据
+    syscProbe syscStrForIndex[buffNum][sameTimeMacNum];//baseIndex使用 负责存储的数据，只是要完成延时的功能
 	time_t selectSysPrbTime(syscProbe sysc[sameTimeMacNum]);//输出结构体时间的函数
 	void reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum]);//将结构体数据紧凑
 	void AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum]);//将整个结构体数组缩减
 	syscProbe zeroSysc;//定义存储全零为syscProbe格式
-	//char timePool[3][14];//用于显示要处理的时间池
+	int storeIndexBuffer;
 };
 
-Probe::Probe()
+Probe::Probe()//各种初始化
 {
 	storeIndex=0;//要更新的数据存储索引，直接从索引0开始存储
-	processIndex=4;//要使基准组的索引号，从2开始
+	processIndex=(storeIndex+1)%buffNum;//要使基准组的索引号，从2开始 storeIndex只负责表示baseIndex的数据
+	storeIndexBuffer=storeIndex;
 	memset(zeroMac,0,sizeof(unsigned char)*6);//定义一个全为零的mac码量
 	memset(zeroTimestamp,0,sizeof(char)*14);//定义一个全为零的时间戳
-	//memset(&zeroRssi,0,sizeof(char));//定义一个全为零的RSSI
 	zeroRssi=0;
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//输出变量初始化
-	memset(syscStr,0,sizeof(syscProbe)*sameTimeMacNum*buffNum*ProbeNum);
+	memset(syscStr,0,sizeof(syscProbe)*sameTimeMacNum*60*ProbeNum);//非baseIndex探针的初始化
+	memset(syscStrForIndex,0,sizeof(syscProbe)*buffNum*sameTimeMacNum);//baseIndex探针的初始化
 	memset(&zeroSysc,0,sizeof(syscProbe));//定义存储全零为syscProbe格式
-	//memset(timePool,0,sizeof(char)*3*14);
 	for(int i=0;i<ProbeNum;i++)
 	{
 		memset(sel[i],0,sizeof(rssiTemp)*sameTimeMacNum);//结构体初始化
 		memset(timeTemp[i],0,sizeof(char)*14);//时间初始化
 		indexForPure[i]=0;//索引初始化
-		flag[i]=false;//标志位初始化
-		saveFinshFlag[i]=0;//存储标志位初始化
-		//for (int j=0;j<3;j++)//同步存储变量初始化
-		//{
-		//	memset(&syscStr[j][i],0,sizeof(syscProbe)*sameTimeMacNum);
-		//}
+		flag[i]=0;//标志位初始化
 	}
 	syscTime=0;
 }
@@ -308,8 +305,14 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//进行同一时间的RSSI优选,
 		if(flag[index]==true)//必须先存到数据才执行写数据
 		{
 			//清空storeIndex下同步结构体的数据
-			memset(syscStr[storeIndex][index],0,sizeof(syscProbe)*sameTimeMacNum);//将同步结构体index索引下的数据置为零
-			//
+			if (index==baseIndex)//如果是baseIndex则将其清零
+			{
+				memset(syscStrForIndex[storeIndex],0,sizeof(syscProbe)*sameTimeMacNum);//将同步结构体index索引下的数据置为零
+			}else//这个地方写的不够好，其实只能默认baseIndex为0，若为其他值，这里会出错，先不管那么多了
+			{
+				memset(syscStr[charTimeGetSecond(timeTemp[index])][index-1],0,sizeof(syscProbe)*sameTimeMacNum);//将数据对应位置清零
+			}
+			//下面部分是RSSI优化要完成的功能
 			bool douflag=timeCompare(timeBuffer[index],timeTemp[index],1);//写在外面减少运算量
 			for(int j=0;j<indexForPure[index];j++)//使用这个索引号减少运算
 			{
@@ -343,21 +346,40 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//进行同一时间的RSSI优选,
 					sel[index][j].selMumac[3], sel[index][j].selMumac[4], sel[index][j].selMumac[5]);
 				fprintf(f,"%d", sel[index][j].maxRssi);
 				fprintf(f,"\n");
-				//探针同步存储部分
-				memcpy(syscStr[storeIndex][index][j].Timestamp,timeTemp[index],sizeof(char)*14);
-				memcpy(syscStr[storeIndex][index][j].selMumac,sel[index][j].selMumac,sizeof(unsigned char)*6);
-				syscStr[storeIndex][index][j].Rssi=sel[index][j].maxRssi;
-				//
+				//探针同步存储部分（重新修改）分为两种情况：是baseIndex和非baseIndex
+				if (index==baseIndex)
+				{
+					memcpy(syscStrForIndex[storeIndex][j].Timestamp,timeTemp[index],sizeof(char)*14);
+					memcpy(syscStrForIndex[storeIndex][j].selMumac,sel[index][j].selMumac,sizeof(unsigned char)*6);
+					syscStrForIndex[storeIndex][j].Rssi=sel[index][j].maxRssi;
+				}else
+				{
+					memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].Timestamp,timeTemp[index],sizeof(char)*14);
+					memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].selMumac,sel[index][j].selMumac,sizeof(unsigned char)*6);
+					syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].Rssi=sel[index][j].maxRssi;
+				}
 			}
 			//将上次的数据存入buffer中，为可能的下一秒备用，注意这里是完整保存的，所以，当连续三秒都出现时，其实只记录第一次出现的值
 			memcpy(timeBuffer[index],timeTemp[index],sizeof(char)*14);//记录已经输出的文件下回可以参考的量
 			memcpy(selBuffer[index],sel[index],sizeof(rssiTemp)*sameTimeMacNum);
 			indexForPureBuf[index]=indexForPure[index];
-			//
 			flag[index]=false;//重新置为否，只运行一次
 			memset(sel[index],0,sizeof(rssiTemp)*sameTimeMacNum);//将结构体重置为零
 			indexForPure[index]=0;//重置
-			saveFinshFlag[index]=1;
+			//探针同步紧凑部分
+			syscProbe temp[sameTimeMacNum];//将使函数紧凑的部分改在这里
+			if (index==baseIndex)
+			{
+				reduceSyscProbe(syscStrForIndex[storeIndex],temp);
+				memcpy(syscStrForIndex[storeIndex],temp,sizeof(syscProbe)*sameTimeMacNum);
+				//推进同步程序的发展
+				storeIndex=(storeIndex+1)%buffNum;
+				processIndex=(storeIndex+1)%buffNum;
+			}else
+			{
+				reduceSyscProbe(syscStr[charTimeGetSecond(timeTemp[index])][index-1],temp);
+				memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1],temp,sizeof(syscProbe)*sameTimeMacNum);
+			}
 		}
 		//不加这个就把第一个数据给漏掉了,并且当数据发生变化输出到文件也会丢掉数据	
 		memcpy(sel[index][0].selMumac,packageData->Mumac,sizeof(unsigned char)*6);
@@ -371,11 +393,9 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//进行同一时间的RSSI优选,
 void Probe::probeProcess()
 {
 	//socket通信绑定部分
-	//bool enable=true;
 	int clientAddrLength = sizeof(clientAddr); 
 	char buffer[BUFFER_SIZE];
 	ZeroMemory(buffer, BUFFER_SIZE); 
-	//bool syscZeroEnable=true;//记录系统时间使能端
 	//定义接收
 	if (recvfrom(s,buffer,BUFFER_SIZE,0,(SOCKADDR *)&clientAddr,&clientAddrLength) == SOCKET_ERROR)
 	{
@@ -392,18 +412,7 @@ void Probe::probeProcess()
 	packageData = (struct cliprobeData *) buffer;//格式化数据 
 	char retime[14]="";//初始化数据为空
 	probeTimeFix(packageData->Timestamp,retime);//修复时间戳格式，使其变成14位
-	//printf("修复格式前的时间：\n");
-	//for (int ii=0;ii<14;ii++)
-	//{
-	//	printf("%c",packageData->Timestamp[ii]);
-	//}
-	//printf("\n");
-	//printf("修复格式后的时间：\n");
-	//for (int ii=0;ii<14;ii++)
-	//{
-	//	printf("%c",retime[ii]);
-	//}
-	//printf("\n");
+
 	//当探针时间是同步的时候，其返回的时间是顺序排列的，不会超前传输，因此，就只记录每次时间存储的变化量，
 	//相当于存储同一时间间隔的几个表，但是，只比较中间的那个，后面的不考虑，把时间的比较放在结构体中，因为探针返回的时间并不是连续的
 	//需要每有一次时间变化就记录一次，将时间间隔记录下来，设置一个函数，用来处理结构体，且能设置以谁为基准
@@ -413,11 +422,7 @@ void Probe::probeProcess()
 
 	if(int(packageData->Rssi)>THD)//测试下阈值比较合适
 	{	
-	/*	for (int ii=0;ii<14;ii++) 
-		{
-			printf("%c", retime[ii]);
-		}
-		printf("\n");*/
+
 		cout<<charToTimeInt(retime)<<endl;
 		//应该在外面完成数据的统一合并
 		
@@ -427,46 +432,16 @@ void Probe::probeProcess()
 			rssiPurify(retime,fp1,0);
 		}
 		else if(addr[10]=='2')
-		{
-			
+		{		
 			cout<<"探针2的数据"<<endl;
 			rssiPurify(retime,fp2,1);
 		}
-		//该部分暂时没用
-		//for (int mm=0;mm<ProbeNum;mm++)//必须要让两个都存储完///这个存在一个错误，会因为一个探针连续存储两次，而数据会因此丢失。修改如下：
-		//{                                                     //现将探针的存完的标识，该为只有主索引的标识，只要存完即可，在存储时只强调baseIndex探针的储存按组，而非索引跳过时间，只按照之前的存储。
-		//	enable=enable&&saveFinshFlag[mm];                 //还要验证是不是从处理索引开始的。
-		//}
-		if (saveFinshFlag[baseIndex])//输出时间不同时，将标志位保存下(syscTime<charToTimeInt(retime))&&
+
+		if (storeIndex!=storeIndexBuffer)//只要baseIndex存储完毕后就去处理数据
 		{
-			syscTime=charToTimeInt(retime);
-			cout<<"同步了因为"<<syscTime<<endl;
-			/*	printf("要同步的时间池: ");
-			for (int man=0;man<3;man++)
-			{
-			for (int ii=0;ii<14;ii++) 
-			{
-			printf("%c", timePool[man][ii]);
-			}
-			printf("  ");
-			}
-			printf("\n");
-			printf("要处理的时间： ");
-			for (int ii=0;ii<14;ii++) 
-			{
-			printf("%c", timePool[processIndex][ii]);
-			}
-			printf("\n");
-			memcpy(timePool[storeIndex],retime,sizeof(char)*14);*/
+			storeIndexBuffer=storeIndex;
+			cout<<"同步函数运行"<<endl;
 			probeSysc(fpSysc);//同步处理函数
-			//for (int mm=0;mm<ProbeNum;mm++)//处理完后重新置0///感觉还是有问题~~~~会出现数据大面积丢失的问题，应该还需要修改，修改在break地方上，或者两个时间域的判断上
-			//{
-			saveFinshFlag[baseIndex]=0;
-	/*		}*/
-			//enable=1;//重新重置
-			storeIndex=(storeIndex+1)%buffNum;//存储索引加1
-			processIndex=(processIndex+1)%buffNum;//处理索引加1
-			
 		}
 	}
 }
@@ -475,50 +450,39 @@ void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数
 {
 	//初始化部分
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//用于多探针集合表格式，清空
-
-	syscProbe syscStrEd[buffNum][ProbeNum][sameTimeMacNum];//定义用于存储紧凑后的变量
-	memset(syscStrEd,0,(sizeof(syscProbe)*buffNum*ProbeNum*sameTimeMacNum));//清空&初始化
-
-	AllreduceSyscProbe(syscStr,syscStrEd);//通过该函数将数据紧凑一些
 	int jianshao=0;
+	int timePoint=charTimeGetSecond(syscStrForIndex[processIndex][0].Timestamp);//记下时间
 	//判断部分
 	for (int m=0;m<sameTimeMacNum;m++)//该循环是将baseIndex探针中processIndex时间下的结构体数据与其他索引进行比较
 	{
-		if (memcmp(&syscStrEd[processIndex][baseIndex][m],&zeroSysc,sizeof(syscProbe))==0)//为空跳出，减少运算
+		if (memcmp(&syscStrForIndex[processIndex][m],&zeroSysc,sizeof(syscProbe))==0)//为空跳出，减少运算
 		{
 			break;
 		}	
 		++jianshao;
 		//先把变量存下来
-		memcpy(syscResult[m].Timestamp,syscStrEd[processIndex][baseIndex][m].Timestamp,sizeof(char)*14);
-		memcpy(syscResult[m].selMumac,syscStrEd[processIndex][baseIndex][m].selMumac,sizeof(unsigned char)*6);
-		syscResult[m].Rssi[baseIndex]=syscStrEd[processIndex][baseIndex][m].Rssi;
-		for(int n=0;n<ProbeNum;n++)//该循环是剔除baseIndex的索引，方便与其他探针比较,n表示探针索引
-		{
-			if(n==baseIndex)//跳出基准索引
+		memcpy(syscResult[m].Timestamp,syscStrForIndex[processIndex][m].Timestamp,sizeof(char)*14);
+		memcpy(syscResult[m].selMumac,syscStrForIndex[processIndex][m].selMumac,sizeof(unsigned char)*6);
+		syscResult[m].Rssi[baseIndex]=syscStrForIndex[processIndex][m].Rssi;
+
+		for(int n=0;n<ProbeNum-1;n++)//该循环剔除baseIndex，只比较其他两个探针的数据
+		{	
+			for (int k=(timePoint-1)%60;k!=(timePoint+2)%60;k=(k+1)%60)//用这个来将时间的限制在上下一秒内
 			{
-				continue;
-			}	
-			for (int k=0;k<buffNum;k++)//遍历时间,这里做了一点小改动，希望从最早的时间开始记录。就将k变成((processIndex+2+k)%3)，默认最先到的最好、、、、、！！！！需要验证
-			{	
 				bool skip=0;
-				//if (!(timeCompare(syscStrEd[((processIndex+2+k)%buffNum)][n][0].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1)))//当时间不合格时，直接跳出,因为一块的时间是相同的，所以用0就可以
-				//{
-				//	continue;//通过该判断去除时间不合格的变量
-				//}
 				for (int l=0;l<sameTimeMacNum;l++)//遍历一个时间块下, l表示块内存储索引
 				{	
-					if (memcmp(&syscStrEd[k][n][l],&zeroSysc,sizeof(syscProbe))==0)
+					if (memcmp(&syscStr[k][n][l],&zeroSysc,sizeof(syscProbe))==0)
 					{
 						break;//因为已经让数据紧凑了，所以可以直接使用break
 					}
-					if(memcmp(syscStrEd[processIndex][baseIndex][m].selMumac,syscStrEd[k][n][l].selMumac,sizeof(unsigned char)*6)==0)//如果匹配就把RSSI值导入
+					if(timeCompare(syscStr[k][n][l].Timestamp,syscStrForIndex[processIndex][m].Timestamp,1))//如果匹配就把RSSI值导入
 					{
-						if (timeCompare(syscStrEd[k][n][l].Timestamp,syscStrEd[processIndex][baseIndex][0].Timestamp,1))
+						if (memcmp(syscStrForIndex[processIndex][m].selMumac,syscStr[k][n][l].selMumac,sizeof(unsigned char)*6)==0)
 						{
-							syscResult[m].Rssi[n]=syscStrEd[k][n][l].Rssi;
-						    skip=1;
-						    break;
+							syscResult[m].Rssi[n]=syscStr[k][n][l].Rssi;
+							skip=1;
+							break;
 						}
 					}
 				}
@@ -527,6 +491,7 @@ void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数
 					break;
 				}
 			}
+			
 		}
 	}
 	//输出部分，检测均有值才输出
@@ -617,7 +582,14 @@ time_t Probe::charToTimeInt(char ttt[14])
 	timeInt1=mktime(&tt1); 
 	return timeInt1;
 }
-
+int Probe::charTimeGetSecond(char ttt[14])
+{
+	int result;
+	char second[2];
+	memcpy(second,ttt+12,sizeof(char)*2);
+	result=atoi(second);
+	return result;
+}
 time_t Probe::selectSysPrbTime(syscProbe sysc[sameTimeMacNum])//输出syscProbe结构体的时间，好像弄的比较复杂了
 {
 	time_t timeout;
@@ -651,7 +623,7 @@ void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[same
 		}
 	}
 }
-
+//废弃该函数，不使用
 void Probe::AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum])
 {
 	for (int i=0;i<buffNum;i++)
