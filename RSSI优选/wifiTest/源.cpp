@@ -11,11 +11,11 @@
 
 using namespace std;
 #define sameTimeMacNum 10 //表示同一时刻内探针默认最多存储的数据类型数
-#define ProbeNum 2 //表示一共有几个探针返回数据
+#define ProbeNum 3 //表示一共有几个探针返回数据
 #define SERVER_PORT 2222 
 #define BUFFER_SIZE 1024 
 #define THD -80
-#define buffNum 3
+#define buffNum 4 //这个参数很关键，要调的合适一些，调的过大过小都会出现出现数据丢失的问题，目前为4的时候数据较好。
 #define baseIndex 0
 
 class Probe
@@ -57,7 +57,7 @@ public:
 	struct cliprobeData *packageData;
 	WSADATA wsd;//WSADATA 变量
 	SOCKET s;//嵌套字
-	FILE *fp1,*fp2,*fpSysc;
+	FILE *fp1,*fp2,*fp3,*fpSysc;
 	//FILE	*fp3;
 	sockaddr_in servAddr;//服务器地址
 	sockaddr_in clientAddr; 
@@ -144,6 +144,7 @@ Probe::~Probe()
 	::WSACleanup();
 	fclose(fp1);
 	fclose(fp2);
+	fclose(fp3);
 	fclose(fpSysc);
 	exit(0);
 }
@@ -172,6 +173,7 @@ void Probe::InitProbe()
 	}
 	fp1=fopen("probe1.csv","a+");
 	fp2=fopen("probe2.csv","a+");
+	fp3=fopen("probe3.csv","a+");
 	fpSysc=fopen("probeSysc.csv","a+");
 }
 
@@ -435,6 +437,10 @@ void Probe::probeProcess()
 		{		
 			cout<<"探针2的数据"<<endl;
 			rssiPurify(retime,fp2,1);
+		}else if(addr[10]=='3')
+		{
+			cout<<"探针3的数据"<<endl;
+			rssiPurify(retime,fp3,2);
 		}
 
 		if (storeIndex!=storeIndexBuffer)//只要baseIndex存储完毕后就去处理数据
@@ -452,6 +458,7 @@ void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数
 	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//用于多探针集合表格式，清空
 	int jianshao=0;
 	int timePoint=charTimeGetSecond(syscStrForIndex[processIndex][0].Timestamp);//记下时间
+	cout<<"同步时间："<<timePoint<<endl;
 	//判断部分
 	for (int m=0;m<sameTimeMacNum;m++)//该循环是将baseIndex探针中processIndex时间下的结构体数据与其他索引进行比较
 	{
@@ -467,7 +474,7 @@ void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数
 
 		for(int n=0;n<ProbeNum-1;n++)//该循环剔除baseIndex，只比较其他两个探针的数据
 		{	
-			for (int k=(timePoint-1)%60;k!=(timePoint+2)%60;k=(k+1)%60)//用这个来将时间的限制在上下一秒内
+			for (int k=(59+timePoint)%60;k!=(timePoint+62)%60;k=(k+61)%60)//用这个来将时间的限制在上下一秒内
 			{
 				bool skip=0;
 				for (int l=0;l<sameTimeMacNum;l++)//遍历一个时间块下, l表示块内存储索引
@@ -480,7 +487,7 @@ void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中 数
 					{
 						if (memcmp(syscStrForIndex[processIndex][m].selMumac,syscStr[k][n][l].selMumac,sizeof(unsigned char)*6)==0)
 						{
-							syscResult[m].Rssi[n]=syscStr[k][n][l].Rssi;
+							syscResult[m].Rssi[n+1]=syscStr[k][n][l].Rssi;//因为第一位已经占用了，只能从第二位开始
 							skip=1;
 							break;
 						}
