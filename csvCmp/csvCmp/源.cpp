@@ -46,7 +46,7 @@ int main()
 	Csv csv1(filename1);//元素显示测试：
 	char filename2[] = "C://Users//Administrator//Desktop//RSSI优选//wifiTest//probe2.csv"; //文件名
 	Csv csv2(filename2);//元素显示测试：
-	char filename3[] = "C://Users//Administrator//Desktop//RSSI优选//wifiTest//probeSysc.csv"; //文件名
+	char filename3[] = "C://Users//Administrator//Desktop//RSSI优选//wifiTest//probe3.csv"; //文件名
 	Csv csv3(filename3);//元素显示测试：
 	vector <vector <string>> result;    //存储表格结构的二维vector
 	string buffer1;
@@ -66,7 +66,6 @@ int main()
 			const char* sTchar2=sTemp2.c_str();//得到第2个数据
 			string mac2=itt2[1];
 			string rssi2=itt2[2];
-
 			if((charToTimeInt(sTchar2)-charToTimeInt(sTchar1))>5)
 				break;//大于时间跳出
 			if(timeCompare(sTchar2,sTchar1,1))
@@ -74,8 +73,7 @@ int main()
 				if(mac1==mac2)
 				{
 					if((buffer1==sTemp1)&&(buffer2==mac1)&&(buffer3==rssi1))
-					{
-					
+					{	
 					}
 					else{
 						vector <string> rsows;
@@ -92,9 +90,46 @@ int main()
 			}
 		}
 	}	
-	cout<<"result!"<<endl;
+	std::cout<<"result!"<<endl;
+
+	vector<vector<string>> resulted;//用于存储三探针的数据包
+	for (auto rit1 = result.begin(); rit1 < result.end(); ++rit1)
+	{
+		auto rit2 = rit1 -> begin();
+		string sTemp1=rit2[0];	
+		const char* sTchar1=sTemp1.c_str();//得到第一个数据
+		string mac1=rit2[1];
+		for (auto ritt1=csv3.table.begin();ritt1<csv3.table.end()-1;++ritt1)
+		{
+			auto ritt2 = ritt1 -> begin();
+			string sTemp2=ritt2[0];
+			const char* sTchar2=sTemp2.c_str();//得到第2个数据
+			string mac2=ritt2[1];
+			if((charToTimeInt(sTchar2)-charToTimeInt(sTchar1))>5)
+				break;//大于时间跳出
+			if(timeCompare(sTchar2,sTchar1,1))
+			{
+				if(mac1==mac2)
+				{
+						vector <string> rsows;
+						rsows.push_back(sTemp1);
+						rsows.push_back(mac1);
+						rsows.push_back(rit2[2]);
+						rsows.push_back(rit2[3]);
+						rsows.push_back(ritt2[2]);
+						resulted.push_back(rsows);
+					    break;
+				}
+			}
+		}
+	}
+	std::cout<<"resulted!"<<endl;
+
+
+
+
 	//int count=0;
-	////比较部分
+	////比较部分还是直接使用compare更方便
 	//for(auto resIt1=result.begin();resIt1 < result.end(); ++resIt1)
 	//{	
 	//	bool outflag=1;
@@ -123,7 +158,7 @@ int main()
 	//	}
 	//}
 	//cout<<count<<endl;
-	cout<<"finish"<<endl;
+
 	//ofstream outfile;  
 	//outfile.open("C://Users//Administrator//Desktop//RSSI优选//wifiTest//computerSysn.csv",ios::out);  
 	////标准流方式输出文件
@@ -135,7 +170,7 @@ int main()
 	//outfile.close(); 
 
 	//C风格输出文件方式
-	FILE *fpSysc;
+	/*FILE *fpSysc;
 	fpSysc=fopen("C://Users//Administrator//Desktop//RSSI优选//wifiTest//computerSysn.csv","a+");
 	for(auto t1 = result.begin(); t1 != result.end(); ++t1)
 	{
@@ -165,8 +200,45 @@ int main()
 		}
 		fprintf(fpSysc,"\n");
 	}
+	cout<<"finish"<<endl;*/
+	FILE *fpSysc;
+	fpSysc=fopen("C://Users//Administrator//Desktop//RSSI优选//wifiTest//computerSysn.csv","a+");
+	for(auto t1 = resulted.begin(); t1 != resulted.end(); ++t1)
+	{
+		auto t2 = t1 -> begin();
+		const char* a=(t2[0]).c_str();
+		for (int i=0;i<14;i++) 
+		{
+			fprintf(fpSysc,"%c",a[i]);
+		}
+		fprintf(fpSysc,",");
+		const char* b=(t2[1]).c_str();
+		for (int i=0;i<17;i++) 
+		{
+			fprintf(fpSysc,"%c",b[i]);
+		}
+		fprintf(fpSysc,",");
+		const char* c=(t2[2]).c_str();
+		for (int i=0;i<3;i++) 
+		{
+			fprintf(fpSysc,"%c",c[i]);
+		}
+		fprintf(fpSysc,",");
+		const char* d=(t2[3]).c_str();
+		for (int i=0;i<3;i++) 
+		{
+			fprintf(fpSysc,"%c",d[i]);
+		}
+		fprintf(fpSysc,",");
+		const char* e=(t2[4]).c_str();
+		for (int i=0;i<3;i++) 
+		{
+			fprintf(fpSysc,"%c",e[i]);
+		}
+		fprintf(fpSysc,"\n");
+	}
 	cout<<"finish"<<endl;
-	fclose(fpSysc);
+	std::fclose(fpSysc);
 
 	getchar();
 	return 0;
