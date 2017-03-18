@@ -12,6 +12,8 @@ Probe::Probe()//Êı¾İ³õÊ¼»¯
 	memset(syscStr,0,sizeof(syscProbe)*sameTimeMacNum*60*ProbeNum);//·ÇbaseIndexÌ½ÕëµÄ³õÊ¼»¯
 	memset(syscStrForIndex,0,sizeof(syscProbe)*buffNum*sameTimeMacNum);//baseIndexÌ½ÕëµÄ³õÊ¼»¯
 	memset(&zeroSysc,0,sizeof(syscProbe));//¶¨Òå´æ´¢È«ÁãÎªsyscProbe¸ñÊ½
+	memset(rssiData,0,sizeof(char)*ProbeNum*sameTimeMacNum*rssiCapacity);//³õÊ¼»¯
+	memset(rssiIndex,0,sizeof(int)*ProbeNum*sameTimeMacNum);
 	for(int i=0;i<ProbeNum;i++)
 	{
 		memset(sel[i],0,sizeof(rssiTemp)*sameTimeMacNum);//½á¹¹Ìå³õÊ¼»¯
@@ -62,7 +64,6 @@ void Probe::InitProbe()//³õÊ¼»¯
 	fp3=fopen("probe3.csv","a+");
 	fpSysc=fopen("probeSysc.csv","a+");
 }
-
 
 void Probe::probeTimeFix(char src[],char dst[14] ) //ÓÃÀ´´æ´¢ĞŞ¸´ºóµÄÊ±¼äÊı¾İ¸ñÊ½£¬¸ù¾İÏµÍ³Ê±¼äÀ´Íê³ÉĞŞÕı£¬Òò´ËĞèÒªÔÚÊ¹ÓÃÊ±ÒªÍ¬²½
 {
@@ -168,7 +169,7 @@ void Probe::probeTimeFix(char src[],char dst[14] ) //ÓÃÀ´´æ´¢ĞŞ¸´ºóµÄÊ±¼äÊı¾İ¸ñÊ
 }
 
 void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,¼´ºÏ²¢Í¬Ò»Ê±¼ä²¢Ñ¡³ö×î´óµÄRSSI
-{
+{	
 	if(memcmp(timeTemp[index],time,sizeof(char)*14)==0)//Ê±¼äÒ»ÖÂÊ±
 	{
 		for(int i=0;i<sameTimeMacNum;i++)
@@ -177,12 +178,17 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,
 			{
 				memcpy(sel[index][i].selMumac,packageData->Mumac,sizeof(unsigned char)*6);
 				sel[index][i].maxRssi=packageData->Rssi;
+				rssiData[index][i][rssiIndex[index][i]]=packageData->Rssi;//normÓÃ
+				rssiIndex[index][i]++;
 				indexForPure[index]++;
 				break;//Ìø³öÑ­»·
 			}
 			else if(memcmp(packageData->Mumac,sel[index][i].selMumac,sizeof(unsigned char)*6)==0)//±È½ÏÊÇ·ñ³öÏÖÕâÑùµÄ×éºÏ,memcmp ÏàÍ¬·µ»Ø0,²»Í¬·µ»Ø·ÇÁã
 			{
-				sel[index][i].maxRssi=MaxRssi(sel[index][i].maxRssi,packageData->Rssi);
+				rssiData[index][i][rssiIndex[index][i]]=packageData->Rssi;//normÓÃ
+				rssiIndex[index][i]++;
+				//sel[index][i].maxRssi=MaxRssi(sel[index][i].maxRssi,packageData->Rssi);//Ñ¡È¡×î´óµÄRSSIÖµ
+				sel[index][i].maxRssi=NormRssi(rssiData[index][i],rssiIndex[index][i]);//Ñ¡È¡×î´óµÄRSSIÖµ
 				break;//Ìø³öÑ­»·
 			}
 		}
@@ -214,7 +220,6 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,
 						if (memcmp(sel[index][j].selMumac,selBuffer[index][k].selMumac,sizeof(unsigned char)*6)==0)//½«ÒªÊä³öµÄ·Ö±ğÓëÉÏÒ»ÃëµÄÊı¾İ½øĞĞ±È½Ï
 						{
 							skipflag=true;//Èç¹ûÓĞÖØ¸´µÄ£¬¾ÍÊä³öflag,²¢Ìø³öforÑ­»·
-							//cout<<"ÓĞÖØ¸´"<<endl;
 							break;
 						}
 					}
@@ -252,7 +257,9 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,
 			indexForPureBuf[index]=indexForPure[index];
 			flag[index]=false;//ÖØĞÂÖÃÎª·ñ£¬Ö»ÔËĞĞÒ»´Î
 			memset(sel[index],0,sizeof(rssiTemp)*sameTimeMacNum);//½«½á¹¹ÌåÖØÖÃÎªÁã
+			memset(rssiData[index],0,sizeof(char)*sameTimeMacNum*rssiCapacity);//½«RSSIÖµµÄ´æ´¢ÖÃÁã
 			indexForPure[index]=0;//ÖØÖÃ
+			memset(rssiIndex[index],0,sizeof(int)*sameTimeMacNum);//½«´æ´¢RSSIµÄË÷ÒıÖÃÁã
 			//Ì½ÕëÍ¬²½½ô´Õ²¿·Ö
 			syscProbe temp[sameTimeMacNum];//½«Ê¹º¯Êı½ô´ÕµÄ²¿·Ö¸ÄÔÚÕâÀï
 			if (index==baseIndex)
@@ -271,6 +278,8 @@ void Probe::rssiPurify(char time[14],FILE *f,int index)//½øĞĞÍ¬Ò»Ê±¼äµÄRSSIÓÅÑ¡,
 		//²»¼ÓÕâ¸ö¾Í°ÑµÚÒ»¸öÊı¾İ¸øÂ©µôÁË,²¢ÇÒµ±Êı¾İ·¢Éú±ä»¯Êä³öµ½ÎÄ¼şÒ²»á¶ªµôÊı¾İ	
 		memcpy(sel[index][0].selMumac,packageData->Mumac,sizeof(unsigned char)*6);
 		sel[index][0].maxRssi=packageData->Rssi;
+		rssiData[index][0][rssiIndex[index][0]]=packageData->Rssi;//normÓÃ
+		rssiIndex[index][0]++;
 		indexForPure[index]++;
 		flag[index]=true;
 		memcpy(timeTemp[index],time,sizeof(char)*14);//°Ñ±ä»¯µÄÊ±¼ä¸³Öµ¸øtimeTemp
@@ -438,6 +447,69 @@ char Probe::MaxRssi(char rssi1,char rssi2)//·µ»Ø½Ï´óµÄRSSIÖµ£¬ÇÒ¸ÃÖµ²»ÄÜÄÜµÈÓÚ0
 		output=int(t_1)>int(t_2)?rssi1:rssi2;
 	}
 	return output;
+}
+
+char Probe::NormRssi(char a[],int ccc)//Í¨¹ı¸ßË¹º¯ÊıÀ´ÂË²¨
+{
+	double sum=0.0;//ÇóºÍ
+	double mean=0.0;
+	double stdev=0.0;
+	int num=0;
+	for (int kk=0;kk<ccc;kk++)
+	{
+			num++;
+			sum+=a[kk];
+	}
+	if (1==num)//Òª¼ÓÈë¸öÊıµÄÅĞ¶Ï£¬ÖÁÉÙÓĞÁ½¸öÊı²ÅÄÜÅĞ¶Ï¡£
+	{
+		return char(sum);
+	}else
+	{
+		mean =sum/num;//Çó¾ùÖµ
+		double accum=0.0;
+		for (int kk=0;kk<ccc;kk++)
+		{
+             accum+=(a[kk]-mean)*(a[kk]-mean);
+		}
+		stdev=sqrt(accum/num);//Çó±ê×¼²î
+		if (stdev==0)
+		{
+			return char(mean);
+		}
+		int num2=0,sum2=0;
+		for (int kk=0;kk<ccc;kk++)//ÌŞ³ıÖµ
+		{
+			if (myNormCdf((a[kk]-mean)/stdev)>=0.5)
+			{
+				sum2+=a[kk];
+				++num2;
+			}
+		}	
+		if(num2==0)
+			return char(mean);
+		return char(sum2/num2);
+	}	
+}
+
+double Probe::myErf(double x)//Îó²îº¯Êı£¬²Î¿¼ÍøÉÏÀûÓÃÌ©ÀÕ¹«Ê½Õ¹¿ªÇó»ı·Ö
+{
+	double res = x;
+	double factorial = 1;	//n!
+	double x_pow = x;
+	int one = 1, n;
+	for( n=1; n<10; n++ ){
+		factorial *= n;
+		one *= -1;
+		x_pow *= x*x;
+		res += one / factorial * x_pow / ( 2*n+1 );
+	}
+	res *= 2 / sqrt(3.1416);
+	return res;
+}
+
+double Probe::myNormCdf(double x)//¸ßË¹·Ö²¼º¯Êı
+{
+	return ( 1 + myErf( x / sqrt(2) ) ) / 2;
 }
 
 bool Probe::timeCompare(char time1[14],char time2[],int delta)//ÓÉÓÚÊ±¼äÊÇ½øÖÆÀàµÄ£¬ËùÒÔ×î¼òµ¥µÄ·½·¨ÊÇÖ±½Ó×ª»»µ½ÃëÈ¥ÅĞ¶Ï¼ä¸ô
