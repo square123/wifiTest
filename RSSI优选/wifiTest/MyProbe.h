@@ -8,7 +8,7 @@
 #include <iomanip>//可能是格式化16进制的输出文件
 #include<time.h>//加入时间
 #include <fstream>//希望输入时间
-#include<math.h>
+#include <cmath>
 #pragma comment(lib,"WS2_32.lib")
 class Probe
 {
@@ -24,10 +24,10 @@ public:
 	void probeSysc(FILE *f);//处理多探针同步的函数
 	//其他子函数
 	char MaxRssi(char rssi1,char rssi2);//返回较大的RSSI值，且该值不能能等于0
+	char NormRssi(char a[],int ccc);//利用高斯滤波来选取rssi
 	bool timeCompare(char time1[14],char time2[],int delta);//返回时间两个时间是否相差delta秒
 	time_t charToTimeInt(char ttt[14]);//字符串转换成时间int
 	int charTimeGetSecond(char ttt[14]);//获取时间的后两位并转换成int型
-
 
 private:	
 
@@ -39,6 +39,8 @@ private:
 	static const int THD=-80;
 	static const int buffNum=5; //这个参数很关键，要调的合适一些，调的过大过小都会出现出现数据丢失的问题，目前为4的时候数据较好。
 	static const int baseIndex=0;
+	static const int rssiCapacity=30;//这个数是存同一数据同一时间的RSSI的容量
+
 	//探针数据结构部分
 	struct cliprobeData {
 		unsigned char Apmac[6];          //源 AP 的 MAC 地址
@@ -107,9 +109,13 @@ private:
 	}syscStr[60][ProbeNum][sameTimeMacNum];//三维结构体数组，要寄存的时间、探针数量、每秒钟存储的数据
 	syscProbe syscStrForIndex[buffNum][sameTimeMacNum];//baseIndex使用 负责存储的数据，只是要完成延时的功能
 	syscProbe zeroSysc;//定义存储全零为syscProbe格式
+	char rssiData[ProbeNum][sameTimeMacNum][rssiCapacity];//存rssi的for normrssi
+	int rssiIndex[ProbeNum][sameTimeMacNum];//用于推进RSSI的索引
 	int storeIndexBuffer;//同步函数的标志位
-
+	
 	//其他子程序
+	double myErf(double x);//erf函数
+	double myNormCdf(double x);//正态分布函数
 	time_t selectSysPrbTime(syscProbe sysc[sameTimeMacNum]);//输出结构体时间的函数
 	void reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum]);//将结构体数据紧凑
 	void AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum]);//将整个结构体数组缩减
