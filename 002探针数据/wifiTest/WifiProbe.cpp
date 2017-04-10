@@ -2,37 +2,25 @@
 
 Probe::Probe()//数据初始化
 {
-	storeIndex=0;//要更新的数据存储索引，直接从索引0开始存储
-	processIndex=(storeIndex+1)%buffNum;//要使基准组的索引号，从2开始 storeIndex只负责表示baseIndex的数据
-	storeIndexBuffer=storeIndex;
 	memset(zeroMac,0,sizeof(unsigned char)*6);//定义一个全为零的mac码量
 	memset(zeroTimestamp,0,sizeof(char)*14);//定义一个全为零的时间戳
+	memset(sel,0,sizeof(rssiTemp)*ProbeNum*60*sameTimeMacNum);
+	memset(seled,0,sizeof(rssiMiss)*60*sameTimeMacNum);
+	memset(rssiTempIndex,0,sizeof(int)*ProbeNum*60);
+	memset(rssiMissIndex,0,sizeof(int)*60);
+	memset(detProbeTime,0,sizeof(int)*ProbeNum);
+	memset(syscTimeBuff,0,sizeof(int)*ProbeNum);
 	zeroRssi=0;
-	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//输出变量初始化
-	memset(syscStr,0,sizeof(syscProbe)*sameTimeMacNum*60*ProbeNum);//非baseIndex探针的初始化
-	memset(syscStrForIndex,0,sizeof(syscProbe)*buffNum*sameTimeMacNum);//baseIndex探针的初始化
-	memset(&zeroSysc,0,sizeof(syscProbe));//定义存储全零为syscProbe格式
-	memset(rssiData,0,sizeof(char)*ProbeNum*sameTimeMacNum*rssiCapacity);//初始化
-	memset(rssiIndex,0,sizeof(int)*ProbeNum*sameTimeMacNum);
-	for(int i=0;i<ProbeNum;i++)
-	{
-		memset(sel[i],0,sizeof(rssiTemp)*sameTimeMacNum);//结构体初始化
-		memset(timeTemp[i],0,sizeof(char)*14);//时间初始化
-		indexForPure[i]=0;//索引初始化
-		flag[i]=0;//标志位初始化
-		detProbeTime[i]=0;
-		syscTimeBuff[i]=0;
-	}
+	processGetIndex=0;//先暂时这么定义
+	processNotIndex=0;//先暂时这么定义
 }
 
 Probe::~Probe()//用来关闭文件和socket接口
 {
 	closesocket(s);
 	::WSACleanup();
-	fclose(fp1);
-	fclose(fp2);
-	fclose(fp3);
-	fclose(fpSysc);
+	fclose(fpNot);
+	fclose(fpGet);
 	exit(0);
 }
 
@@ -60,11 +48,13 @@ void Probe::InitProbe()//初始化
 		system("pause");
 	}
 	//文件创建部分
-	fp1=fopen("probe1.csv","a+");
-	fp2=fopen("probe2.csv","a+");
-	fp3=fopen("probe3.csv","a+");
-	fpSysc=fopen("probeSysc.csv","a+");
+	fpGet=fopen("probeGet.csv","a+");
+	fpNot=fopen("probeNot.csv","a+");
+	time_t syscTimee=time(NULL);	//这里只执行一次，后续就不需要再操作了
+	processGetIndex=syscTimee+4;//因为是要滞后处理，所以要将处理的标志位滞后，具体的滞后时间参数可以修改
+	processNotIndex=syscTimee+6;
 }
+
 void Probe::timesSysc(time_t &syscTime,mncatsWifi &Probedata)//同步多探针的时间
 {
 	int index=0;
@@ -88,7 +78,6 @@ void Probe::timesSysc(time_t &syscTime,mncatsWifi &Probedata)//同步多探针的时间
 	}
 }
 
-
 void Probe::probeProcess()
 {
 	//socket通信绑定部分
@@ -103,238 +92,249 @@ void Probe::probeProcess()
 		::WSACleanup();
 		system("pause");
 	}
-	time_t syscTime=time(NULL);;	//记录系统时间，用来将其触发时间同步的机制
-	localtime(&syscTime);
+	time_t syscTime=time(NULL);	//记录系统时间，用来将其触发时间同步的机制
+
 	mncatsWifi datatemp=mncatsWifi(buffer);//格式化数据
 	timesSysc(syscTime,datatemp);//负责探针的时间同步
-	char timeFix[16];//用来修复时间
-	time_t timeFixtt=time(NULL);
-	if(datatemp.mac1=="C8:E7:D8:D4:A3:75")//定义的是地址
+	if ((datatemp.dtype!="80")&&(int(datatemp.crssi)>THD))//在这里设置权重，并且去除80beacon帧   (datatemp.dtype!="80")&&(int(datatemp.crssi)>THD)
 	{
-		std::cout<<"探针1的数据"<<std::endl;
-		timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[0];//localtime只是用来转换格式,它并没有获取系统时间的功能，它和gmtime相对。
-		strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
-		rssiPurify(timeFix,datatemp,fp1,0);
-	}
-	else if(datatemp.mac1=="C8:E7:D8:D4:A3:02")
-	{		
-		std::cout<<"探针2的数据"<<std::endl;
-		timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[1];
-		strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
-		rssiPurify(timeFix,datatemp,fp2,1);
-	}else if(datatemp.mac1=="C8:E7:D8:D4:A3:60")
-	{
-		std::cout<<"探针3的数据"<<std::endl;
-		timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[2];
-		strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
-		rssiPurify(timeFix,datatemp,fp3,2);
+		char timeFix[16];//用来修复时间,以后如果出问题可以考虑下是否是这个原因
+		time_t timeFixtt=0;
+		if(datatemp.mac1=="C8:E7:D8:D4:A3:75")//定义的是地址
+		{
+			std::cout<<"探针1的数据"<<std::endl;
+			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[0];//localtime只是用来转换格式,它并没有获取系统时间的功能，它和gmtime相对。
+			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
+			rssiIntegrate(timeFix,datatemp,0);
+		}
+		else if(datatemp.mac1=="C8:E7:D8:D4:A3:02")
+		{		
+			std::cout<<"探针2的数据"<<std::endl;
+			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[1];
+			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
+			rssiIntegrate(timeFix,datatemp,1);
+		}
+		else if(datatemp.mac1=="C8:E7:D8:D4:A3:60")
+		{
+			std::cout<<"探针3的数据"<<std::endl;
+			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[2];
+			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//时间修复
+			rssiIntegrate(timeFix,datatemp,2);
+		}
+		if (syscTime==processGetIndex)//进行插空操作 最终达到循环操作
+		{
+			rssiMissGet();
+			processGetIndex++;
+		}
+		if (syscTime==processNotIndex)//进行补空操作
+		{
+			rssiMissNot();
+			processNotIndex++;
+		}
+		
 	}
 
-	if (storeIndex!=storeIndexBuffer)//只要baseIndex存储完毕后就去处理数据
-	{
-		storeIndexBuffer=storeIndex;
-		std::cout<<"同步函数运行"<<std::endl;
-		probeSysc(fpSysc);//同步处理函数
-	}
 }
 
-//废弃该函数
-void Probe::rssiPurify(char time[14],mncatsWifi &Probedata,FILE *f,int index)//进行同一时间的RSSI优选,即合并同一时间并选出最大的RSSI
-{	
-	if(memcmp(timeTemp[index],time,sizeof(char)*14)==0)//时间一致时
-	{
-		for(int i=0;i<sameTimeMacNum;i++)
-		{
-			if(memcmp(sel[index][i].selMumac,zeroMac,sizeof(unsigned char)*6)==0)//当检测到区域为零时，把测得值赋值给该数组，这个是增加种类的部分
-			{
-				memcpy(sel[index][i].selMumac,Probedata.cmac2,sizeof(unsigned char)*6);
-				//最大值滤波
-				sel[index][i].maxRssi=Probedata.crssi;
-				indexForPure[index]++;
-				break;//跳出循环
-			}
-			else if(memcmp(Probedata.cmac2,sel[index][i].selMumac,sizeof(unsigned char)*6)==0)//比较是否出现这样的组合,memcmp 相同返回0,不同返回非零
-			{
-
-				//最大值滤波
-				sel[index][i].maxRssi=MaxRssi(sel[index][i].maxRssi,Probedata.crssi);//选取最大的RSSI值
-				break;//跳出循环
-			}
-		}
-	}
-	else //当时间不一致的时候要输出数据，并且要把第一个不同的数据存下来，并将时间记录下来
-	{    //输出数据到文件
-		if(flag[index]==true)//必须先存到数据才执行写数据
-		{
-			//清空storeIndex下同步结构体的数据
-			if (index==baseIndex)//如果是baseIndex则将其清零
-			{
-				memset(syscStrForIndex[storeIndex],0,sizeof(syscProbe)*sameTimeMacNum);//将同步结构体index索引下的数据置为零
-			}else//这个地方写的不够好，其实只能默认baseIndex为0，若为其他值，这里会出错，先不管那么多了
-			{
-				memset(syscStr[charTimeGetSecond(timeTemp[index])][index-1],0,sizeof(syscProbe)*sameTimeMacNum);//将数据对应位置清零
-			}
-			//下面部分是RSSI优化要完成的功能
-			bool douflag=timeCompare(timeBuffer[index],timeTemp[index],1);//写在外面减少运算量
-			for(int j=0;j<indexForPure[index];j++)//使用这个索引号减少运算
-			{
-				//给数据加入一个Buffer，可以对数据进行筛选，不用全部存，只要把MAC存入应该就行
-				//添加一个触发条件，即时间间隔必须为一秒，才进行是否重复的判断
-				//减少邻秒输出的判断部分
-				if (douflag)//已经出现的Mac码不再在第二秒输出，后面的数据不管了，因为已经输出了
-				{
-					bool skipflag=false;
-					for (int k=0;k<indexForPureBuf[index];k++)
-					{
-						if (memcmp(sel[index][j].selMumac,selBuffer[index][k].selMumac,sizeof(unsigned char)*6)==0)//将要输出的分别与上一秒的数据进行比较
-						{
-							skipflag=true;//如果有重复的，就输出flag,并跳出for循环
-							break;
-						}
-					}
-					if (skipflag==true)//如果有重复的，就跳出这个环节，比较下一个Mac码
-					{
-						continue;
-					}
-				}
-				//输出文件部分
-				for (int ii=0;ii<14;ii++) 
-				{
-					fprintf(f,"%c", timeTemp[index][ii]);
-				}
-				fprintf(f,",");
-				fprintf(f,"%02X:%02X:%02X:%02X:%02X:%02X,", sel[index][j].selMumac[0], sel[index][j].selMumac[1], sel[index][j].selMumac[2], \
-					sel[index][j].selMumac[3], sel[index][j].selMumac[4], sel[index][j].selMumac[5]);
-				fprintf(f,"%d,", sel[index][j].maxRssi);//输出最大值
-				fprintf(f,"\n");
-				//探针同步存储部分-------分为两种情况：是baseIndex和非baseIndex
-				if (index==baseIndex)
-				{
-					memcpy(syscStrForIndex[storeIndex][j].Timestamp,timeTemp[index],sizeof(char)*14);
-					memcpy(syscStrForIndex[storeIndex][j].selMumac,sel[index][j].selMumac,sizeof(unsigned char)*6);
-					syscStrForIndex[storeIndex][j].Rssi=sel[index][j].maxRssi;
-				}else
-				{
-					memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].Timestamp,timeTemp[index],sizeof(char)*14);
-					memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].selMumac,sel[index][j].selMumac,sizeof(unsigned char)*6);
-					syscStr[charTimeGetSecond(timeTemp[index])][index-1][j].Rssi=sel[index][j].maxRssi;
-				}
-			}
-			//将上次的数据存入buffer中，为可能的下一秒备用，注意这里是完整保存的，所以，当连续三秒都出现时，其实只记录第一次出现的值
-			memcpy(timeBuffer[index],timeTemp[index],sizeof(char)*14);//记录已经输出的文件下回可以参考的量
-			memcpy(selBuffer[index],sel[index],sizeof(rssiTemp)*sameTimeMacNum);
-			indexForPureBuf[index]=indexForPure[index];
-			flag[index]=false;//重新置为否，只运行一次
-			memset(sel[index],0,sizeof(rssiTemp)*sameTimeMacNum);//将结构体重置为零
-			memset(rssiData[index],0,sizeof(char)*sameTimeMacNum*rssiCapacity);//将RSSI值的存储置零
-			indexForPure[index]=0;//重置
-			memset(rssiIndex[index],0,sizeof(int)*sameTimeMacNum);//将存储RSSI的索引置零
-			//探针同步紧凑部分
-			syscProbe temp[sameTimeMacNum];//将使函数紧凑的部分改在这里
-			if (index==baseIndex)
-			{
-				reduceSyscProbe(syscStrForIndex[storeIndex],temp);
-				memcpy(syscStrForIndex[storeIndex],temp,sizeof(syscProbe)*sameTimeMacNum);
-				//推进同步程序的发展
-				storeIndex=(storeIndex+1)%buffNum;
-				processIndex=(storeIndex+1)%buffNum;
-			}else
-			{
-				reduceSyscProbe(syscStr[charTimeGetSecond(timeTemp[index])][index-1],temp);
-				memcpy(syscStr[charTimeGetSecond(timeTemp[index])][index-1],temp,sizeof(syscProbe)*sameTimeMacNum);
-			}
-		}
-		//不加这个就把第一个数据给漏掉了,并且当数据发生变化输出到文件也会丢掉数据	
-		memcpy(sel[index][0].selMumac,Probedata.cmac2,sizeof(unsigned char)*6);
-		sel[index][0].maxRssi=Probedata.crssi;
-		indexForPure[index]++;
-		flag[index]=true;
-		memcpy(timeTemp[index],time,sizeof(char)*14);//把变化的时间赋值给timeTemp
-	}
-}
-//废弃该函数
-void Probe::probeSysc(FILE *f)//探针同步函数,将同步后的数据存储到一个新的表中
+void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//作为新探针的整合程序，精简了文件存储部分，让代码简化了
 {
-	//初始化部分
-	memset(syscResult,0,sizeof(syscProbed)*sameTimeMacNum);//用于多探针集合表格式，清空
-	int jianshao=0;
-	int timePoint=charTimeGetSecond(syscStrForIndex[processIndex][0].Timestamp);//记下时间
-	std::cout<<"同步时间："<<timePoint<<std::endl;
-	//判断部分
-	for (int m=0;m<sameTimeMacNum;m++)//该循环是将baseIndex探针中processIndex时间下的结构体数据与其他索引进行比较
+	int second=charTimeGetSecond(time);
+	bool storeflag=1;
+	for (int i=0;i<rssiTempIndex[index][second];i++)//这样设计的主要原因在于数据只有一次
 	{
-		if (memcmp(&syscStrForIndex[processIndex][m],&zeroSysc,sizeof(syscProbe))==0)//为空跳出，减少运算
+		if (memcmp(sel[index][second][i].selMumac,Probedata.cmac2,sizeof(unsigned char)*6)==0)//当数据已经存在将数据的最大Rssi更新
 		{
+			sel[index][second][i].maxRssi=MaxRssi(sel[index][second][i].maxRssi,Probedata.crssi);
+			storeflag=0;//如果匹配到就无需保存了
 			break;
-		}	
-		++jianshao;
-		//先把变量存下来
-		memcpy(syscResult[m].Timestamp,syscStrForIndex[processIndex][m].Timestamp,sizeof(char)*14);
-		memcpy(syscResult[m].selMumac,syscStrForIndex[processIndex][m].selMumac,sizeof(unsigned char)*6);
-		syscResult[m].Rssi[baseIndex]=syscStrForIndex[processIndex][m].Rssi;
+		}
+	}
+	if (storeflag)//如果未匹配到则保存
+	{
+		memcpy(sel[index][second][rssiTempIndex[index][second]].Timestamp,time,sizeof(char)*14);
+		memcpy(sel[index][second][rssiTempIndex[index][second]].selMumac,Probedata.cmac2,sizeof(unsigned char)*6);
+		sel[index][second][rssiTempIndex[index][second]].maxRssi=Probedata.crssi;
+		rssiTempIndex[index][second]++;//将索引向后推进一位
+	}
+}
 
-		for(int n=0;n<ProbeNum-1;n++)//该循环剔除baseIndex，只比较其他两个探针的数据
-		{	
-			for (int k=(59+timePoint)%60;k!=(timePoint+62)%60;k=(k+61)%60)//用这个来将时间的限制在上下一秒内
+void  Probe::rssiMissGet()//用于找出数据为空的集合，负责整合和清空，应该还拥有输出文件的功能。
+{
+	char timeFixed[16];
+	time_t processGetIndexInit=processGetIndex-4;
+	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processGetIndexInit));
+	int second=charTimeGetSecond(timeFixed);
+	//得到数据的并集
+	struct tempMac
+	{
+		unsigned char Mac[6];
+	}tempmac[sameTimeMacNum];
+	rssiMissIndex[second]=rssiTempIndex[0][second];//先把第一个探针的数据写进去
+	for(int i1=0;i1< rssiTempIndex[0][second];i1++)
+	{
+		if (rssiTempIndex[0][second]==0)//若没有存到数据则跳出
+			break;
+		memcpy(tempmac[i1].Mac,sel[0][second][i1].selMumac,sizeof(unsigned char)*6);
+	}
+	for (int i = 1; i < ProbeNum; i++)//找到其他探针的并集
+	{
+		if (rssiTempIndex[i][second]==0)//若没有存到数据则跳出
+			continue;
+		for (int j = 0; j < rssiTempIndex[i][second]; j++)
+		{
+			bool sstoreflag=1;
+			for (int k = 0; k <rssiMissIndex[second]; k++)
 			{
-				bool skip=0;
-				for (int l=0;l<sameTimeMacNum;l++)//遍历一个时间块下, l表示块内存储索引
-				{	
-					if (memcmp(&syscStr[k][n][l],&zeroSysc,sizeof(syscProbe))==0)
-					{
-						break;//因为已经让数据紧凑了，所以可以直接使用break
-					}
-					if(timeCompare(syscStr[k][n][l].Timestamp,syscStrForIndex[processIndex][m].Timestamp,1))//如果匹配就把RSSI值导入
-					{
-						if (memcmp(syscStrForIndex[processIndex][m].selMumac,syscStr[k][n][l].selMumac,sizeof(unsigned char)*6)==0)
-						{
-							syscResult[m].Rssi[n+1]=syscStr[k][n][l].Rssi;//因为第一位已经占用了，只能从第二位开始
-							//syscResult[m].NRssi[n+1]=syscStr[k][n][l].NRssi;//因为第一位已经占用了，只能从第二位开始//高斯
-							skip=1;
-							break;
-						}
-					}
-				}
-				if (skip)//减少运算量，要是检测到一个值，就直接跳出这个时间
+				if (memcmp(sel[i][second][j].selMumac,tempmac[k].Mac,sizeof(unsigned char)*6)==0)//如果存在,就什么都不做，因为已经存到并集了
 				{
+					sstoreflag=0;
 					break;
 				}
 			}
+			if (sstoreflag)//如果不存在，则将其存入并集中
+			{
+				memcpy(tempmac[rssiMissIndex[second]].Mac,sel[i][second][j].selMumac,sizeof(unsigned char)*6);
+				rssiMissIndex[second]++;
+			}
 		}
 	}
-	//输出文件部分，检测均有值才输出
-	for (int q=0;q<jianshao;++q)
+	//要加入是否为空的判断
+	if (rssiMissIndex[second]!=0)
 	{
-		bool outflag=1;
-		outflag=outflag&&memcmp(syscResult[q].selMumac,zeroMac,sizeof(unsigned char)*6);//有一个就好
-		for (int r=0;r<ProbeNum;r++)
+		//根据并集将数据重组
+		for (int i = 0; i < rssiMissIndex[second]; i++)//探针所存在的元素
 		{
-			outflag=outflag&&memcmp(&syscResult[q].Rssi[r],&zeroRssi,sizeof(char));//这里就不检查了，因为max有，norm必定有
+			memcpy(seled[second][i].Timestamp,timeFixed,sizeof(char)*14);
+			memcpy(seled[second][i].Mumac,tempmac[i].Mac,sizeof(unsigned char)*6);
+			for (int j = 0; j < ProbeNum; j++)//填补各个探针
+			{
+				bool flagg=1;
+				for (int k = 0; k < rssiTempIndex[j][second]; k++)
+				{
+					if (memcmp(seled[second][i].Mumac,sel[j][second][k].selMumac,sizeof(unsigned char)*6)==0)
+					{
+						seled[second][i].Rssi[j]=sel[j][second][k].maxRssi;
+						flagg=0;
+						break;
+					}
+				}
+				if (flagg)//如果没有查到，只能将其置为0
+				{
+					seled[second][i].Rssi[j]=0;
+				}
+			}
 		}
-		if(outflag)
+		//检测该函数部分,以后可以删除
+		std::cout<<"get函数输出了"<<timeFixed<<std::endl;
+		for (int index=0;index<rssiMissIndex[second];index++)
 		{
 			for (int ii=0;ii<14;ii++) 
 			{
-				fprintf(fpSysc,"%c", syscResult[q].Timestamp[ii]);
+				fprintf(fpGet,"%c", seled[second][index].Timestamp[ii]);
 			}
-			fprintf(fpSysc,",");
-			fprintf(fpSysc,"%02X:%02X:%02X:%02X:%02X:%02X,",syscResult[q].selMumac[0], syscResult[q].selMumac[1], syscResult[q].selMumac[2], \
-				syscResult[q].selMumac[3], syscResult[q].selMumac[4], syscResult[q].selMumac[5]);
+			fprintf(fpGet,",");
+			fprintf(fpGet,"%02X:%02X:%02X:%02X:%02X:%02X,",seled[second][index].Mumac[0], seled[second][index].Mumac[1], seled[second][index].Mumac[2], \
+				seled[second][index].Mumac[3],seled[second][index].Mumac[4], seled[second][index].Mumac[5]);
 			//输出三个探针的RSSI信息部分
 			for (int r=0;r<ProbeNum;r++)
 			{
-				fprintf(fpSysc,"%d", syscResult[q].Rssi[r]);
+				fprintf(fpGet,"%d", seled[second][index].Rssi[r]);
 				if(r!=ProbeNum-1)//最后一个不输出逗号
 				{
-					fprintf(fpSysc,",");
+					fprintf(fpGet,",");
 				}
 			}
-			//输出三个探针的差值信息部分
-			//fprintf(fpSysc,",%d,%d,%d",syscResult[q].Rssi[0]-syscResult[q].Rssi[1],syscResult[q].Rssi[1]-syscResult[q].Rssi[2],syscResult[q].Rssi[2]-syscResult[q].Rssi[0]);
-			fprintf(fpSysc,"\n");
+			fprintf(fpGet,"\n");
 		}
 	}
-} 
+	//在操作完成后，结尾完成清空，无论是否有，都需要在该操作中将数据清空，要包括索引
+	for (int i=0;i<ProbeNum;i++)
+	{
+		memset(sel[i][second],0,sizeof(rssiTemp)*sameTimeMacNum);
+		rssiTempIndex[i][second]=0;
+	}
+}
+
+void  Probe::rssiMissNot()//用于填补数据为空的集合 明天分析不能连续输出的原因
+{
+	char timeFixed[16];
+	time_t processNotIndexInit=processNotIndex-6;
+	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processNotIndexInit));
+	int second=charTimeGetSecond(timeFixed);
+	//要加入是否为空的判断，才输出
+	if (rssiMissIndex[second]!=0)
+	{
+		//填补函数的部分
+		for (int i = 0; i < rssiMissIndex[second]; i++)//遍历组合后的结果
+		{
+			for (int j = 0; j < ProbeNum; j++)//遍历RSSI
+			{
+				if (seled[second][i].Rssi[j]==0)//找出发现RSSI为0的部分
+				{
+					//开始上下查找，填补空值,取相邻时间相同Mac地址有值的RSSI的最大值，默认都遍历一回，没有就算了
+					for (int k = 0; k < rssiMissIndex[(second-1)%60]; k++)//向前一秒查找
+					{
+						if (rssiMissIndex[(second-1)%60]==0)
+							break;
+						if (memcmp(seled[(second-1)%60][k].Mumac,seled[second][i].Mumac,sizeof(unsigned char)*6)==0)
+						{
+							seled[second][i].Rssi[j]=MaxRssi(seled[(second-1)%60][k].Rssi[j],seled[second][i].Rssi[j]);
+							break;
+						}
+					}
+					for (int k = 0; k < rssiMissIndex[(second+1)%60]; k++)//向后一秒查找
+					{
+						if (rssiMissIndex[(second+1)%60]==0)
+							break;
+						if (memcmp(seled[(second+1)%60][k].Mumac,seled[second][i].Mumac,sizeof(unsigned char)*6)==0)
+						{
+							seled[second][i].Rssi[j]=MaxRssi(seled[(second+1)%60][k].Rssi[j],seled[second][i].Rssi[j]);
+							break;
+						}
+					}
+				}
+			}
+		}
+		//文件输出函数&检测该函数部分
+		std::cout<<"Not函数输出了"<<timeFixed<<std::endl;
+		for (int index=0;index<rssiMissIndex[second];index++)
+		{
+			for (int ii=0;ii<14;ii++) 
+			{
+				fprintf(fpNot,"%c", seled[second][index].Timestamp[ii]);
+			}
+			fprintf(fpNot,",");
+			fprintf(fpNot,"%02X:%02X:%02X:%02X:%02X:%02X,",seled[second][index].Mumac[0], seled[second][index].Mumac[1], seled[second][index].Mumac[2], \
+				seled[second][index].Mumac[3],seled[second][index].Mumac[4], seled[second][index].Mumac[5]);
+			//输出多个探针的RSSI信息部分
+			for (int r=0;r<ProbeNum;r++)
+			{
+				fprintf(fpNot,"%d", seled[second][index].Rssi[r]);
+				if(r!=ProbeNum-1)//最后一个不输出逗号
+				{
+					fprintf(fpNot,",");
+				}
+			}
+			fprintf(fpNot,"\n");
+		}
+	}	
+	//清空，并且要更加滞后才行,清空的应该是上一个变量
+	memset(seled[(second-1)%60],0,sizeof(rssiMiss)*sameTimeMacNum);
+	rssiMissIndex[(second-1)%60]=0;
+	//后续分析函数 等Kinect函数封装好再写，kinect函数应该有输入的位置，还应该把旋转矩阵集成到程序中。可以设置坐标。查找的方法不知能否通过关联容器来写
+	//rssiForMac();
+	//rssiForMacAnalyticed();
+}
+
+void  Probe::rssiForMac()//用于找出对应Mac的RSSI序列集合，希望能够连接数据库提高性能
+{
+
+}
+
+void  Probe::rssiForMacAnalyticed()//用于特定序列的变换 暂定，或许以后可以合并
+{
+	//可以设计自己的权值和算法
+}
 
 char Probe::MaxRssi(char rssi1,char rssi2)//返回较大的RSSI值，且该值不能能等于0
 {
@@ -465,49 +465,49 @@ int Probe::charTimeGetSecond(char ttt[14])//获得得到数据的后两位
 	result=atoi(second);
 	return result;
 }
-
-time_t Probe::selectSysPrbTime(syscProbe sysc[sameTimeMacNum])//输出syscProbe结构体的时间，好像弄的比较复杂了
-{
-	time_t timeout;
-	for (int i=0;i<sameTimeMacNum;i++)
-	{
-		if (memcmp(sysc[i].Timestamp,zeroTimestamp,sizeof(char)*14)==0)
-		{
-			continue;
-		}else
-		{
-			timeout=charToTimeInt(sysc[i].Timestamp);
-			break;
-		}
-	}
-	return timeout;
-}
-
-void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum])
-{
-	memset(sysced,0,sizeof(syscProbe)*sameTimeMacNum);//将输出结构体数组置零
-	int j=0;
-	for (int i=0;i<sameTimeMacNum;i++)
-	{
-		if (memcmp(&zeroSysc,&sysc[i],sizeof(syscProbe))!=0)//如果不为空，就保存在新的数据集合中
-		{
-			memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//这句写的不对，不能取地址
-			//memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
-			//memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
-			//sysced[j].Rssi=sysc[i].Rssi;
-			//sysced[j].NRssi=sysc[i].NRssi;
-			j++;
-		}
-	}
-}
-//废弃该函数，不使用
-void Probe::AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum])
-{
-	for (int i=0;i<buffNum;i++)
-	{
-		for (int j=0;j<ProbeNum;j++)
-		{
-			reduceSyscProbe(Allsysc[i][j],Allsysced[i][j]);
-		}
-	}
-}
+//
+//time_t Probe::selectSysPrbTime(syscProbe sysc[sameTimeMacNum])//输出syscProbe结构体的时间，好像弄的比较复杂了
+//{
+//	time_t timeout;
+//	for (int i=0;i<sameTimeMacNum;i++)
+//	{
+//		if (memcmp(sysc[i].Timestamp,zeroTimestamp,sizeof(char)*14)==0)
+//		{
+//			continue;
+//		}else
+//		{
+//			timeout=charToTimeInt(sysc[i].Timestamp);
+//			break;
+//		}
+//	}
+//	return timeout;
+//}
+//
+//void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum])
+//{
+//	memset(sysced,0,sizeof(syscProbe)*sameTimeMacNum);//将输出结构体数组置零
+//	int j=0;
+//	for (int i=0;i<sameTimeMacNum;i++)
+//	{
+//		if (memcmp(&zeroSysc,&sysc[i],sizeof(syscProbe))!=0)//如果不为空，就保存在新的数据集合中
+//		{
+//			memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//这句写的不对，不能取地址
+//			//memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
+//			//memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
+//			//sysced[j].Rssi=sysc[i].Rssi;
+//			//sysced[j].NRssi=sysc[i].NRssi;
+//			j++;
+//		}
+//	}
+//}
+////废弃该函数，不使用
+//void Probe::AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum])
+//{
+//	for (int i=0;i<buffNum;i++)
+//	{
+//		for (int j=0;j<ProbeNum;j++)
+//		{
+//			reduceSyscProbe(Allsysc[i][j],Allsysced[i][j]);
+//		}
+//	}
+//}
