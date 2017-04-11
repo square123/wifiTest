@@ -10,7 +10,9 @@
 #include <fstream>//希望输入时间
 #include <cmath>
 #include <vector>
+#include <map>
 #include "MncatsWifi.h"
+#include "myCsv.h"
 #pragma comment(lib,"WS2_32.lib")
 class Probe
 {
@@ -34,6 +36,7 @@ public:
 	time_t charToTimeInt(char ttt[14]);//字符串转换成时间int
 	void timesSysc(time_t &syscTime,mncatsWifi &Probedata);//同步多探针的时间
 	int charTimeGetSecond(char ttt[14]);//获取时间的后两位并转换成int型
+	void mobileManuOutput(mncatsWifi &Probedata);//输出手机网卡的厂商
 
 private:	
 
@@ -46,7 +49,6 @@ private:
 	   //socket通信部分
 	static const int SERVER_PORT=2222 ;
 	static const int BUFFER_SIZE=2048 ;
-	//static const int baseIndex=0;
 
 	//中间变量部分
 		//socket通信用
@@ -54,6 +56,9 @@ private:
 	SOCKET s;//嵌套字
 	sockaddr_in servAddr;//服务器地址
 	sockaddr_in clientAddr; //客户端地址
+
+		//mac码厂商查找部分
+	std::map<std::string,std::string> mobileManu;//Mac码映射关系表
 
 		//文件存储部分
 	FILE *fpGet,*fpNot;
@@ -87,9 +92,6 @@ private:
 	//其他子程序
 	double myErf(double x);//erf函数
 	double myNormCdf(double x);//正态分布函数
-	//time_t selectSysPrbTime(syscProbe sysc[sameTimeMacNum]);//输出结构体时间的函数
-	//void reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum]);//将结构体数据紧凑
-	//void AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum]);//将整个结构体数组缩减
 };
 
 #endif
