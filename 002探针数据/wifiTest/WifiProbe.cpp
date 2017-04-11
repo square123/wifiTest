@@ -96,7 +96,7 @@ void Probe::probeProcess()
 
 	mncatsWifi datatemp=mncatsWifi(buffer);//¸ñÊ½»¯Êı¾İ
 	timesSysc(syscTime,datatemp);//¸ºÔğÌ½ÕëµÄÊ±¼äÍ¬²½
-	if ((datatemp.dtype!="80")&&(int(datatemp.crssi)>THD))//ÔÚÕâÀïÉèÖÃÈ¨ÖØ£¬²¢ÇÒÈ¥³ı80beaconÖ¡   (datatemp.dtype!="80")&&(int(datatemp.crssi)>THD)
+	if ((datatemp.dtype!="80")&&(int(datatemp.crssi)>THD))//ÔÚÕâÀïÉèÖÃÈ¨ÖØ£¬²¢ÇÒÈ¥³ı80beaconÖ¡  
 	{
 		char timeFix[16];//ÓÃÀ´ĞŞ¸´Ê±¼ä,ÒÔºóÈç¹û³öÎÊÌâ¿ÉÒÔ¿¼ÂÇÏÂÊÇ·ñÊÇÕâ¸öÔ­Òò
 		time_t timeFixtt=0;
@@ -121,12 +121,12 @@ void Probe::probeProcess()
 			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//Ê±¼äĞŞ¸´
 			rssiIntegrate(timeFix,datatemp,2);
 		}
-		if (syscTime==processGetIndex)//½øĞĞ²å¿Õ²Ù×÷ ×îÖÕ´ïµ½Ñ­»·²Ù×÷
+		if (syscTime>=processGetIndex)//½øĞĞ²å¿Õ²Ù×÷ ×îÖÕ´ïµ½Ñ­»·²Ù×÷,¸Ä³É´óÓÚµÈÓÚÊÇÒòÎªÊı¾İÓĞ¿ÉÄÜ´æÔÚÌøÃë
 		{
 			rssiMissGet();
 			processGetIndex++;
 		}
-		if (syscTime==processNotIndex)//½øĞĞ²¹¿Õ²Ù×÷
+		if (syscTime>=processNotIndex)//½øĞĞ²¹¿Õ²Ù×÷
 		{
 			rssiMissNot();
 			processNotIndex++;
@@ -136,9 +136,10 @@ void Probe::probeProcess()
 
 }
 
-void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//×÷ÎªĞÂÌ½ÕëµÄÕûºÏ³ÌĞò£¬¾«¼òÁËÎÄ¼ş´æ´¢²¿·Ö£¬ÈÃ´úÂë¼ò»¯ÁË
+void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//×÷ÎªĞÂÌ½ÕëµÄÕûºÏ³ÌĞò£¬¾«¼òÁËÎÄ¼ş´æ´¢²¿·Ö£¬ÈÃ´úÂë¼ò»¯ÁË,Ê¹ÓÃÃëÖÓ×÷Îª¿Õ¼äµÄ´æ´¢£¬ÄÜ¹»Æğµ½¾À´íµÄ×÷ÓÃ
 {
 	int second=charTimeGetSecond(time);
+	std::cout<<"rssiintÔËĞĞµÄÊ±¼äÎª"<<second<<std::endl;
 	bool storeflag=1;
 	for (int i=0;i<rssiTempIndex[index][second];i++)//ÕâÑùÉè¼ÆµÄÖ÷ÒªÔ­ÒòÔÚÓÚÊı¾İÖ»ÓĞÒ»´Î
 	{
@@ -160,6 +161,7 @@ void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//×÷ÎªĞ
 
 void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä³öÎÄ¼şµÄ¹¦ÄÜ¡£
 {
+	std::cout<<"rssiMissGETÔËĞĞÁË "<<std::endl;
 	char timeFixed[16];
 	time_t processGetIndexInit=processGetIndex-4;
 	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processGetIndexInit));
@@ -225,7 +227,7 @@ void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä
 			}
 		}
 		//¼ì²â¸Ãº¯Êı²¿·Ö,ÒÔºó¿ÉÒÔÉ¾³ı
-		std::cout<<"getº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
+		std::cout<<"Getº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
 		for (int index=0;index<rssiMissIndex[second];index++)
 		{
 			for (int ii=0;ii<14;ii++) 
@@ -257,6 +259,7 @@ void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä
 
 void  Probe::rssiMissNot()//ÓÃÓÚÌî²¹Êı¾İÎª¿ÕµÄ¼¯ºÏ Ã÷Ìì·ÖÎö²»ÄÜÁ¬ĞøÊä³öµÄÔ­Òò
 {
+	std::cout<<"rssiMissNotÔËĞĞÁË "<<std::endl;
 	char timeFixed[16];
 	time_t processNotIndexInit=processNotIndex-6;
 	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processNotIndexInit));
