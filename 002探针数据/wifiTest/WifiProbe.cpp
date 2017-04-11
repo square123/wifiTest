@@ -47,6 +47,14 @@ void Probe::InitProbe()//³õÊ¼»¯
 		::WSACleanup();
 		system("pause");
 	}
+	//¿ÉÑ¡ Mac³§ÉÌ²éÕÒ²¿·Ö
+	Csv csv("¾«¼ò°æÊÖ»úÆ·ÅÆ¶ÔÓ¦±í.csv");//¸ÃÆ·ÅÆ¶ÔÓ¦±í²»ÊÇºÜÈ«£¬µ±Ê±ÓĞÉ¾µôµÄ²¿·Ö£¬ÏÂ´Î¿ÉÒÔÖ»°ÑÖ÷ÒªÊÖ»úµÄMacµØÖ·¼ÇÂ¼ÏÂÀ´¼´¿É¡£
+	for (auto i=csv.table.begin();i!=csv.table.end();i++)
+	{
+		auto i1=i->begin();
+		auto i2=i->begin()+1;
+		mobileManu[*i1]=*i2;
+	}
 	//ÎÄ¼ş´´½¨²¿·Ö
 	fpGet=fopen("probeGet.csv","a+");
 	fpNot=fopen("probeNot.csv","a+");
@@ -54,6 +62,22 @@ void Probe::InitProbe()//³õÊ¼»¯
 	processGetIndex=syscTimee+4;//ÒòÎªÊÇÒªÖÍºó´¦Àí£¬ËùÒÔÒª½«´¦ÀíµÄ±êÖ¾Î»ÖÍºó£¬¾ßÌåµÄÖÍºóÊ±¼ä²ÎÊı¿ÉÒÔĞŞ¸Ä
 	processNotIndex=syscTimee+6;
 }
+
+void Probe::mobileManuOutput(mncatsWifi &Probedata)//Êä³öÊÖ»úÍø¿¨µÄ¶ÔÓ¦³§ÉÌ
+{
+	std::string mac;
+	mac=Probedata.mac2.substr(0,2)+Probedata.mac2.substr(3,2)+Probedata.mac2.substr(6,2);
+	auto itt = mobileManu.find(mac);
+	if (itt != mobileManu.end())
+	{
+		std::cout<<itt->second;
+	}
+	else
+	{
+		std::cout<<"ÆäËûÆ·ÅÆ";
+	}
+}
+
 
 void Probe::timesSysc(time_t &syscTime,mncatsWifi &Probedata)//Í¬²½¶àÌ½ÕëµÄÊ±¼ä
 {
@@ -93,7 +117,6 @@ void Probe::probeProcess()
 		system("pause");
 	}
 	time_t syscTime=time(NULL);	//¼ÇÂ¼ÏµÍ³Ê±¼ä£¬ÓÃÀ´½«Æä´¥·¢Ê±¼äÍ¬²½µÄ»úÖÆ
-
 	mncatsWifi datatemp=mncatsWifi(buffer);//¸ñÊ½»¯Êı¾İ
 	timesSysc(syscTime,datatemp);//¸ºÔğÌ½ÕëµÄÊ±¼äÍ¬²½
 	if ((datatemp.dtype!="80")&&(int(datatemp.crssi)>THD))//ÔÚÕâÀïÉèÖÃÈ¨ÖØ£¬²¢ÇÒÈ¥³ı80beaconÖ¡  
@@ -102,21 +125,27 @@ void Probe::probeProcess()
 		time_t timeFixtt=0;
 		if(datatemp.mac1=="C8:E7:D8:D4:A3:75")//¶¨ÒåµÄÊÇµØÖ·
 		{
-			std::cout<<"Ì½Õë1µÄÊı¾İ"<<std::endl;
+			std::cout<<"Ì½Õë1µÄÊı¾İ"<<" ";
+			mobileManuOutput(datatemp);
+			std::cout<<std::endl;
 			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[0];//localtimeÖ»ÊÇÓÃÀ´×ª»»¸ñÊ½,Ëü²¢Ã»ÓĞ»ñÈ¡ÏµÍ³Ê±¼äµÄ¹¦ÄÜ£¬ËüºÍgmtimeÏà¶Ô¡£
 			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//Ê±¼äĞŞ¸´
 			rssiIntegrate(timeFix,datatemp,0);
 		}
 		else if(datatemp.mac1=="C8:E7:D8:D4:A3:02")
 		{		
-			std::cout<<"Ì½Õë2µÄÊı¾İ"<<std::endl;
+			std::cout<<"Ì½Õë2µÄÊı¾İ"<<" ";
+			mobileManuOutput(datatemp);
+			std::cout<<std::endl;
 			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[1];
 			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//Ê±¼äĞŞ¸´
 			rssiIntegrate(timeFix,datatemp,1);
 		}
 		else if(datatemp.mac1=="C8:E7:D8:D4:A3:60")
 		{
-			std::cout<<"Ì½Õë3µÄÊı¾İ"<<std::endl;
+			std::cout<<"Ì½Õë3µÄÊı¾İ"<<" ";
+			mobileManuOutput(datatemp);
+			std::cout<<std::endl;
 			timeFixtt=charToTimeInt(datatemp.Timestamp)+detProbeTime[2];
 			strftime(timeFix,sizeof(timeFix),"%Y%m%d%H%M%S",localtime(&timeFixtt));//Ê±¼äĞŞ¸´
 			rssiIntegrate(timeFix,datatemp,2);
@@ -131,15 +160,13 @@ void Probe::probeProcess()
 			rssiMissNot();
 			processNotIndex++;
 		}
-		
 	}
-
 }
 
 void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//×÷ÎªĞÂÌ½ÕëµÄÕûºÏ³ÌĞò£¬¾«¼òÁËÎÄ¼ş´æ´¢²¿·Ö£¬ÈÃ´úÂë¼ò»¯ÁË,Ê¹ÓÃÃëÖÓ×÷Îª¿Õ¼äµÄ´æ´¢£¬ÄÜ¹»Æğµ½¾À´íµÄ×÷ÓÃ
 {
 	int second=charTimeGetSecond(time);
-	std::cout<<"rssiintÔËĞĞµÄÊ±¼äÎª"<<second<<std::endl;
+	//std::cout<<"rssiintÔËĞĞµÄÊ±¼äÎª"<<second<<std::endl;
 	bool storeflag=1;
 	for (int i=0;i<rssiTempIndex[index][second];i++)//ÕâÑùÉè¼ÆµÄÖ÷ÒªÔ­ÒòÔÚÓÚÊı¾İÖ»ÓĞÒ»´Î
 	{
@@ -161,7 +188,7 @@ void  Probe::rssiIntegrate(char time[14],mncatsWifi &Probedata,int index)//×÷ÎªĞ
 
 void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä³öÎÄ¼şµÄ¹¦ÄÜ¡£
 {
-	std::cout<<"rssiMissGETÔËĞĞÁË "<<std::endl;
+	//std::cout<<"rssiMissGETÔËĞĞÁË "<<std::endl;
 	char timeFixed[16];
 	time_t processGetIndexInit=processGetIndex-4;
 	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processGetIndexInit));
@@ -227,7 +254,7 @@ void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä
 			}
 		}
 		//¼ì²â¸Ãº¯Êı²¿·Ö,ÒÔºó¿ÉÒÔÉ¾³ı
-		std::cout<<"Getº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
+		//std::cout<<"Getº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
 		for (int index=0;index<rssiMissIndex[second];index++)
 		{
 			for (int ii=0;ii<14;ii++) 
@@ -259,7 +286,7 @@ void  Probe::rssiMissGet()//ÓÃÓÚÕÒ³öÊı¾İÎª¿ÕµÄ¼¯ºÏ£¬¸ºÔğÕûºÏºÍÇå¿Õ£¬Ó¦¸Ã»¹ÓµÓĞÊä
 
 void  Probe::rssiMissNot()//ÓÃÓÚÌî²¹Êı¾İÎª¿ÕµÄ¼¯ºÏ Ã÷Ìì·ÖÎö²»ÄÜÁ¬ĞøÊä³öµÄÔ­Òò
 {
-	std::cout<<"rssiMissNotÔËĞĞÁË "<<std::endl;
+	//std::cout<<"rssiMissNotÔËĞĞÁË "<<std::endl;
 	char timeFixed[16];
 	time_t processNotIndexInit=processNotIndex-6;
 	strftime(timeFixed,sizeof(timeFixed),"%Y%m%d%H%M%S",localtime(&processNotIndexInit));
@@ -299,7 +326,7 @@ void  Probe::rssiMissNot()//ÓÃÓÚÌî²¹Êı¾İÎª¿ÕµÄ¼¯ºÏ Ã÷Ìì·ÖÎö²»ÄÜÁ¬ĞøÊä³öµÄÔ­Òò
 			}
 		}
 		//ÎÄ¼şÊä³öº¯Êı&¼ì²â¸Ãº¯Êı²¿·Ö
-		std::cout<<"Notº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
+		//std::cout<<"Notº¯ÊıÊä³öÁË"<<timeFixed<<std::endl;
 		for (int index=0;index<rssiMissIndex[second];index++)
 		{
 			for (int ii=0;ii<14;ii++) 
@@ -468,49 +495,3 @@ int Probe::charTimeGetSecond(char ttt[14])//»ñµÃµÃµ½Êı¾İµÄºóÁ½Î»
 	result=atoi(second);
 	return result;
 }
-//
-//time_t Probe::selectSysPrbTime(syscProbe sysc[sameTimeMacNum])//Êä³ösyscProbe½á¹¹ÌåµÄÊ±¼ä£¬ºÃÏñÅªµÄ±È½Ï¸´ÔÓÁË
-//{
-//	time_t timeout;
-//	for (int i=0;i<sameTimeMacNum;i++)
-//	{
-//		if (memcmp(sysc[i].Timestamp,zeroTimestamp,sizeof(char)*14)==0)
-//		{
-//			continue;
-//		}else
-//		{
-//			timeout=charToTimeInt(sysc[i].Timestamp);
-//			break;
-//		}
-//	}
-//	return timeout;
-//}
-//
-//void Probe::reduceSyscProbe(syscProbe sysc[sameTimeMacNum],syscProbe sysced[sameTimeMacNum])
-//{
-//	memset(sysced,0,sizeof(syscProbe)*sameTimeMacNum);//½«Êä³ö½á¹¹ÌåÊı×éÖÃÁã
-//	int j=0;
-//	for (int i=0;i<sameTimeMacNum;i++)
-//	{
-//		if (memcmp(&zeroSysc,&sysc[i],sizeof(syscProbe))!=0)//Èç¹û²»Îª¿Õ£¬¾Í±£´æÔÚĞÂµÄÊı¾İ¼¯ºÏÖĞ
-//		{
-//			memcpy(&sysced[j],&sysc[i],sizeof(syscProbe));//Õâ¾äĞ´µÄ²»¶Ô£¬²»ÄÜÈ¡µØÖ·
-//			//memcpy(sysced[j].selMumac,sysc[i].selMumac,sizeof(unsigned char)*6);
-//			//memcpy(sysced[j].Timestamp,sysc[i].Timestamp,sizeof(char)*14);
-//			//sysced[j].Rssi=sysc[i].Rssi;
-//			//sysced[j].NRssi=sysc[i].NRssi;
-//			j++;
-//		}
-//	}
-//}
-////·ÏÆú¸Ãº¯Êı£¬²»Ê¹ÓÃ
-//void Probe::AllreduceSyscProbe(syscProbe Allsysc[buffNum][ProbeNum][sameTimeMacNum],syscProbe Allsysced[buffNum][ProbeNum][sameTimeMacNum])
-//{
-//	for (int i=0;i<buffNum;i++)
-//	{
-//		for (int j=0;j<ProbeNum;j++)
-//		{
-//			reduceSyscProbe(Allsysc[i][j],Allsysced[i][j]);
-//		}
-//	}
-//}
