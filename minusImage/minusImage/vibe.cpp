@@ -6,17 +6,28 @@ using namespace cv;
 int c_xoff[9] = {-1,  0,  1, -1, 1, -1, 0, 1, 0};  //x的邻居点
 int c_yoff[9] = {-1,  0,  1, -1, 1, -1, 0, 1, 0};  //y的邻居点
 
-ViBe_BGS::ViBe_BGS(void)
+ViBeHue::ViBeHue(Mat &src)
 {
-
+	if (src.channels()!=3)
+	{
+		cout<<"输入图像必须是彩色图像！"<<endl;
+	}
+	src.copyTo(oriImg);
+	GaussianBlur(oriImg,oriImgGauss,Size(3,3),0,0);
+	cvtColor(oriImgGauss,oriImgGray,CV_RGB2GRAY);
+	cvtColor(oriImgGauss,oriImgCovert,CV_BGR2HLS_FULL);
+	split(oriImgCovert,orisplit);
+	init(oriImgGray);
+	processFirstFrame(oriImgGray);	
 }
-ViBe_BGS::~ViBe_BGS(void)
+
+ViBeHue::~ViBeHue(void)
 {
 
 }
 
 /**************** Assign space and init ***************************/
-void ViBe_BGS::init(const Mat& _image)
+void ViBeHue::init(const Mat& _image)
 {
 	m_samples.create(_image.size(),CV_8UC(NUM_SAMPLES));
 	m_samples.setTo(0);
@@ -25,7 +36,7 @@ void ViBe_BGS::init(const Mat& _image)
 }
 
 /**************** Init model from first frame ********************/
-void ViBe_BGS::processFirstFrame(const Mat& _image)
+void ViBeHue::processFirstFrame(const Mat& _image)
 {
 	RNG rng;
 	int rstep, cstep;
@@ -55,7 +66,7 @@ void ViBe_BGS::processFirstFrame(const Mat& _image)
 }
 
 /**************** Test a new frame and update model ********************/
-void ViBe_BGS::testAndUpdate(const Mat& _image)
+void ViBeHue::testAndUpdate(const Mat& _image)
 {
 	RNG rng;
 	int stepsize = _image.step;
@@ -134,4 +145,32 @@ void ViBe_BGS::testAndUpdate(const Mat& _image)
 			}
 		}
 	}
+}
+
+void ViBeHue::operator()(Mat &image, Mat &fgmask)//要求输入的矩阵是彩色的矩阵
+{
+	if (image.channels()!=3)
+	{
+		cout<<"输入图像必须是彩色三通道图像"<<endl;
+	}
+
+	//获得基本矩阵
+	Mat imageGauss,imageCovt,imageGray;
+	vector<Mat> imageSplit;
+	GaussianBlur(image,imageGauss,Size(3,3),0,0);
+	cvtColor(imageGauss,imageGray,CV_RGB2GRAY);
+	cvtColor(imageGauss,imageCovt,CV_BGR2HLS_FULL);
+	split(imageCovt,imageSplit);
+
+	//获得vibe的基本矩阵
+	Mat tempMat;
+	testAndUpdate(imageGray);
+	tempMat = getMask();
+
+	//预处理部分
+	Mat smoothMat;
+	deNoise(tempMat,fgmask);
+
+
+//将hue与合并	
 }

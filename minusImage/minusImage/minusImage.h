@@ -32,9 +32,6 @@ public:
 	Mat oriImgGray;//灰度转换后图片
 	Mat oriImgCovert; //色域转换后的图片
 	vector<Mat> orisplit;//需要分离的hls区域
-private:
-	void fillHole(const Mat srcBw, Mat &dstBw);
-	void selectArea(Mat &src,Mat &dst, int minNum,int maxNum);
-	void hullArea(Mat &src,Mat &dst);
+
 };
 
