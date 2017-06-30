@@ -52,7 +52,7 @@ public:
 	//匹配算法 输出的应该是一个向量  vector<matchResult> 包括Mac地址和分数 包含很多元素 输出算法应该有排序的成分在里面
 	//最后的输入应该是一个人物的数据和多个探针的数据，在函数中应该还需要处理，最后的输出应该是排序后的输出
 	//算法一定要取交集不然会出错
-	vector<matchResult> matchProcess(vector<camData> &cam,vector<rssiData> &rssi);
+	void matchProcess(vector<camData> &cam,vector<rssiData> &rssi,vector<matchResult> &res);
 private:
 
 	//选取一个时间段的函数 涉及到表的操作 这些应该都是先在mysql上的表进行操作，最后才读取数据
@@ -60,9 +60,9 @@ private:
 	//按行排序元素 似乎没啥用,因为总会去排序的
 	
 	//找出不重复的元素 这个输出的是string 输出的应该是Mac地址元素
-	vector<string> uniqueMac(const char *srcTable,const char *dstTable);
-	vector<rssiData> rssiDataGet(vector<vector<string>> &tempData);//读取rssi数据的函数
-	vector<camData> camDataGet(vector<vector<string>> &tempData);//读取cam数据的函数
+	void uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm);
+	void rssiDataGet(const char *srcTable,const string name,vector<rssiData> &dst);//读取rssi数据的函数
+	void camDataGet(const char *srcTable,const string name,vector<camData> &dst);//读取cam数据的函数
 
 	string charTo02XStr(unsigned char input);//将char类型转换成02X字符串型
 	string macToString(unsigned char Mymac[6]);//完成将char类型转换成字符串
@@ -237,7 +237,7 @@ void syscMySQL::insertCamData(const char *tableName,const char *time,int name,do
 	}  
 }
 
-void syscMySQL::readData(const char *tableName,vector<vector<string>>  &tempOut )
+void syscMySQL::readData(const char *tableName,vector<vector<string>>  &tempOut ) //读取数据使用，一般用的很少
 {
 	string sqlstr="SELECT * FROM ";
 	sqlstr+=tableName;
@@ -253,11 +253,12 @@ void syscMySQL::readData(const char *tableName,vector<vector<string>>  &tempOut 
 		//打印各行  
 		MYSQL_ROW row = NULL;  
 		row = mysql_fetch_row(result);  
-		vector<string> rowTemp;
 		while (NULL != row) {  
+			vector<string> rowTemp;
 			for (int i = 0; i < fieldcount; i++) {  
 				rowTemp.push_back(row[i]);//应该重新定义一个数据结构
 			}  
+			tempOut.push_back(rowTemp);
 			row = mysql_fetch_row(result);  
 		}  
 	}  
@@ -336,7 +337,7 @@ string syscMySQL::doubleToString(double x)//char 转 string 函数
 	return stream.str();
 }
 
-void syscMySQL::selTimeBetween(const char *srcTable,const char *dstTable,const char *timeBegin,const char *timeEnd)
+void syscMySQL::selTimeBetween(const char *srcTable,const char *dstTable,const char *timeBegin,const char *timeEnd)//尽量减少mysql表的操作，减少在程序里的操作
 {
 	string sqlstr="create table ";
 	sqlstr+=dstTable;
@@ -349,28 +350,73 @@ void syscMySQL::selTimeBetween(const char *srcTable,const char *dstTable,const c
 	sqlstr+=";";
 }
 
-vector<string> syscMySQL::uniqueMac(const char *srcTable,const char *dstTable)
+void syscMySQL::uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm) //写成通用的
 {
-	vector<string> uniqueTerm;
+	string sqlstr="SELECT distinct ";
+	sqlstr+=name;
+	sqlstr+=" FROM ";
+	sqlstr+=srcTable;  
+	MYSQL_RES *result = NULL; 
+	if (0 == mysql_query(&mydata, sqlstr.c_str())) 
+	{
+		result = mysql_store_result(&mydata); 
+		unsigned int fieldcount = mysql_num_fields(result);  
+		MYSQL_ROW row = NULL;  
+		row = mysql_fetch_row(result);  
+		while (NULL != row) {  
+			for (int i = 0; i < fieldcount; i++)
+			{  
+				uniqueTerm.push_back(row[i]);
+			}  
+			row = mysql_fetch_row(result);  
+		}  
+		mysql_free_result(result);  
+	}
+	else
+	{
+		cout << "mysql_query() select data failed" << endl;  
+		mysql_free_result(result);  
+		mysql_close(&mydata); 
+	}  
+}
+
+void syscMySQL::rssiDataGet(const char *srcTable,const string name,vector<rssiData> &dst)//读取rssi数据的函数
+{
+	string sqlstr="SELECT * FROM ";
+	sqlstr+=srcTable;
+	sqlstr+=" WHERE macAddress='";
+	sqlstr+=name;  
+	sqlstr+="' order by macAddress asc;";
+	MYSQL_RES *result = NULL; 
+	if (0 == mysql_query(&mydata, sqlstr.c_str())) 
+	{
+		result = mysql_store_result(&mydata);  
+		MYSQL_ROW row = NULL;  
+		row = mysql_fetch_row(result);  
+		while (NULL != row) {  
+			rssiData ttt;
+			ttt.
+			 
+				dst.push_back(row[i]);
+			 
+			row = mysql_fetch_row(result);  
+		}  
+		mysql_free_result(result);  
+	}
+	else
+	{
+		cout << "mysql_query() select data failed" << endl;  
+		mysql_free_result(result);  
+		mysql_close(&mydata); 
+	}  
+}
+
+void syscMySQL::camDataGet(const char *srcTable,const string name,vector<syscMySQL::camData> &dst)//读取cam数据的函数
+{
 
 }
 
-vector<syscMySQL::rssiData> syscMySQL::rssiDataGet(vector<vector<string>> &tempData)//读取rssi数据的函数
-{
-
-}
-
-vector<syscMySQL::camData> syscMySQL::camDataGet(vector<vector<string>> &tempData)//读取cam数据的函数
-{
-
-}
-
-vector<syscMySQL::matchResult> syscMySQL::matchProcess(vector<camData> &cam,vector<rssiData> &rssi)
-{
-
-}
-
-void syscMySQL::readData(const char *tableName,vector<vector<string>> &tempData )//读取table的元素 
+void syscMySQL::matchProcess(vector<camData> &cam,vector<rssiData> &rssi,vector<syscMySQL::matchResult> &res)
 {
 
 }

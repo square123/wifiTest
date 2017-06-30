@@ -1,6 +1,7 @@
 #include <winsock.h>  
 #include <iostream>  
 #include <string>
+#include <vector>
 #include <sstream> //用于转换的char类型到string型
 #include <mysql.h>  
 using namespace std;  
@@ -217,7 +218,7 @@ int main() {
 
 	for(auto i:terms)
 	{
-		cout<<i<<endl;
+		cout<<"xx"<<i<<endl;
 	}
 // 
 // #ifdef STEPBYSTEP  
