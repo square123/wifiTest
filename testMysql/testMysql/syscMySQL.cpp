@@ -2,7 +2,7 @@
 
 //´æÊý¾ÝµÄÊ±ºòÓ¦¸Ãµ¥¶ÀÐ´¸öº¯Êý£¬²»ÓÃºÜ¸´ÔÓ
 
-syscMySQL::syscMySQL() //Ä¬ÈÏµÄÊý¾Ý¿â
+syscMySQL::syscMySQL() //Ä¬ÈÏµÄÊý¾Ý¿âtest
 {
 	//³õÊ¼»¯Êý¾Ý¿â  
 	if (0 != mysql_library_init(0, NULL, NULL))  
@@ -40,7 +40,7 @@ syscMySQL::~syscMySQL()
 	mysql_server_end();  
 }
 
-void syscMySQL::rssiTabCre(const char *tableName)
+void syscMySQL::rssiTabCre(const char *tableName)  
 {
 	string sqlstr;  
 	sqlstr = "CREATE TABLE IF NOT EXISTS ";  
@@ -59,7 +59,7 @@ void syscMySQL::rssiTabCre(const char *tableName)
 	sqlstr +=  
 		"rssi3  int(11)  null,";  //rssi3
 	sqlstr +=  
-		"rssi4  int(11)  null,";  //rssi4
+		"rssi4  int(11)  null";  //rssi4
 	sqlstr += ");";  
 	if (0 != mysql_query(&mydata, sqlstr.c_str())) 
 	{  
@@ -79,7 +79,7 @@ void syscMySQL::camTabCre(const char *tableName)
 	sqlstr +=  
 		"time  varchar(14)  null,";  //Ê±¼ä
 	sqlstr +=  
-		"index  varchar(20)  null,";  //index
+		"name  varchar(20)  null,";  //index²»ÄÜ×ö¹Ø¼ü´Ê
 	sqlstr +=  
 		"dis1  int(11)  null,";  //dis1
 	sqlstr +=  
@@ -87,7 +87,7 @@ void syscMySQL::camTabCre(const char *tableName)
 	sqlstr +=  
 		"dis3  int(11)  null,";  //dis3
 	sqlstr +=  
-		"dis4  int(11)  null,";  //dis4
+		"dis4  int(11)  null";  //dis4
 	sqlstr += ");";  
 	if (0 != mysql_query(&mydata, sqlstr.c_str())) 
 	{  
@@ -227,7 +227,7 @@ string syscMySQL::macToString(unsigned char Mymac[6])//Íê³É½«charÀàÐÍ×ª»»³É×Ö·û´
 	output=charTo02XStr(Mymac[0]);
 	for(int i=1;i<6;i++)
 	{
-		output=output+"_"+charTo02XStr(Mymac[i]);
+		output=output+":"+charTo02XStr(Mymac[i]);
 	}
 	return output;
 }
@@ -269,10 +269,10 @@ int syscMySQL::stringToInt(string x)
 	stringstream stream;
 	stream<<x;
 	stream>>temp;
-	if (!stream.good()) 
-	{ 
-		cout<<"error transform strToInt";
-	}
+// 	if (!stream.good()) 
+// 	{ 
+// 		cout<<"error transform strToInt";
+// 	}
 	return temp;
 }
 
@@ -282,11 +282,15 @@ void syscMySQL::selTimeBetween(const char *srcTable,const char *dstTable,const c
 	sqlstr+=dstTable;
 	sqlstr+=" as select * from ";
 	sqlstr+=srcTable;
-	sqlstr+=" where time between ";
+	sqlstr+=" where time between '";
 	sqlstr+=timeBegin;
-	sqlstr+=" and ";
+	sqlstr+="' and '";
 	sqlstr+=timeEnd;
-	sqlstr+=";";
+	sqlstr+="';";
+	if (0 != mysql_query(&mydata, sqlstr.c_str())) {  
+		cout << "mysql_query() insert data failed" << endl;  
+		mysql_close(&mydata);  
+	}  
 }
 
 void syscMySQL::uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm) //Ð´³ÉÍ¨ÓÃµÄ
@@ -319,13 +323,13 @@ void syscMySQL::uniqueMac(const char *srcTable,const string name,vector<string> 
 	}  
 }
 
-void syscMySQL::rssiDataGet(const char *srcTable,const string name,vector<rssiData> &dst)//¶ÁÈ¡rssiÊý¾ÝµÄº¯Êý
+void syscMySQL::rssiDataGet(const char *srcTable,const string name,vector<syscMySQL::rssiData> &dst)//¶ÁÈ¡rssiÊý¾ÝµÄº¯Êý
 {
 	string sqlstr="SELECT * FROM ";
 	sqlstr+=srcTable;
 	sqlstr+=" WHERE macAddress='";
 	sqlstr+=name;  
-	sqlstr+="' order by macAddress asc;";
+	sqlstr+="' order by time asc;";
 	MYSQL_RES *result = NULL; 
 	if (0 == mysql_query(&mydata, sqlstr.c_str())) 
 	{
@@ -359,7 +363,7 @@ void syscMySQL::camDataGet(const char *srcTable,const string name,vector<syscMyS
 	sqlstr+=srcTable;
 	sqlstr+=" WHERE name='";
 	sqlstr+=name;  
-	sqlstr+="' order by name asc;";
+	sqlstr+="' order by time asc;";
 	MYSQL_RES *result = NULL; 
 	if (0 == mysql_query(&mydata, sqlstr.c_str())) 
 	{

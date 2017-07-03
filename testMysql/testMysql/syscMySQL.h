@@ -22,6 +22,8 @@ class syscMySQL
 {
 private:
 	MYSQL mydata; //数据库的操作
+
+public:
 	struct rssiData  //主要是有关数的结构需要转换下，便于后续去比较
 	{
 		string macName;
@@ -40,7 +42,6 @@ private:
 		double score;//分数
 		int num; //需要两次更新分数
 	};
-public:
 	syscMySQL();
 	syscMySQL(const char *host,const char *user,const char *passwd,const char *db);
 	~syscMySQL();
@@ -62,13 +63,14 @@ public:
 	vector<int> minusFeatureTran(vector<int> &src1,vector<int> &src2);
 	void renewResult(vector<matchResult> &src);
 
-private:
+
 	
 	void selTimeBetween(const char *srcTable,const char *dstTable,const char *timeBegin,const char *timeEnd);//选取一个时间段的函数 涉及到表的操作 这些应该都是先在mysql上的表进行操作，最后才读取数据	
 	void uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm);//找出不重复的元素 这个输出的是string 输出的应该是Mac地址元素
 	void rssiDataGet(const char *srcTable,const string name,vector<rssiData> &dst);//读取rssi数据的函数
 	void camDataGet(const char *srcTable,const string name,vector<camData> &dst);//读取cam数据的函数
-
+	
+private:
 	string charTo02XStr(unsigned char input);//将char类型转换成02X字符串型
 	string macToString(unsigned char Mymac[6]);//完成将char类型转换成字符串
 	string timeToStrng(char timeData[14]);//time转string 函数
