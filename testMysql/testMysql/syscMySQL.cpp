@@ -288,12 +288,12 @@ void syscMySQL::selTimeBetween(const char *srcTable,const char *dstTable,const c
 	sqlstr+=timeEnd;
 	sqlstr+="';";
 	if (0 != mysql_query(&mydata, sqlstr.c_str())) {  
-		cout << "mysql_query() insert data failed" << endl;  
+		cout << "mysql_query() selTimeBetween failed" << endl;  
 		mysql_close(&mydata);  
 	}  
 }
 
-void syscMySQL::uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm) //写成通用的
+void syscMySQL::uniqueMac(const char *srcTable,const char *name,vector<string> &uniqueTerm) //写成通用的
 {
 	string sqlstr="SELECT distinct ";
 	sqlstr+=name;
@@ -317,7 +317,7 @@ void syscMySQL::uniqueMac(const char *srcTable,const string name,vector<string> 
 	}
 	else
 	{
-		cout << "mysql_query() select data failed" << endl;  
+		cout << "mysql_query() unique failed" << endl;  
 		mysql_free_result(result);  
 		mysql_close(&mydata); 
 	}  
@@ -327,7 +327,7 @@ void syscMySQL::rssiDataGet(const char *srcTable,const string name,vector<syscMy
 {
 	string sqlstr="SELECT * FROM ";
 	sqlstr+=srcTable;
-	sqlstr+=" WHERE macAddress='";
+	sqlstr+=" WHERE mac='";
 	sqlstr+=name;  
 	sqlstr+="' order by time asc;";
 	MYSQL_RES *result = NULL; 
@@ -351,13 +351,13 @@ void syscMySQL::rssiDataGet(const char *srcTable,const string name,vector<syscMy
 	}
 	else
 	{
-		cout << "mysql_query() select data failed" << endl;  
+		cout << "mysql_query() rssiDataGet failed" << endl;  
 		mysql_free_result(result);  
 		mysql_close(&mydata); 
 	}  
 }
 
-void syscMySQL::camDataGet(const char *srcTable,const string name,vector<syscMySQL::camData> &dst)//读取cam数据的函数
+void syscMySQL::camDataGet(const char *srcTable,const char* name,vector<syscMySQL::camData> &dst)//读取cam数据的函数
 {
 	string sqlstr="SELECT * FROM ";
 	sqlstr+=srcTable;
@@ -385,7 +385,7 @@ void syscMySQL::camDataGet(const char *srcTable,const string name,vector<syscMyS
 	}
 	else
 	{
-		cout << "mysql_query() select data failed" << endl;  
+		cout << "mysql_query() camDataGet failed" << endl;  
 		mysql_free_result(result);  
 		mysql_close(&mydata); 
 	}  
@@ -401,12 +401,14 @@ void syscMySQL::matchProcess(const char *srcCamTable,const char *srcRssiTable,co
 	camDataGet("tempCam",camName,cam);
 	//获取rssi中存在的mac地址
 	vector<string> rssiName;
-	uniqueMac("tempRssi","macAddress",rssiName);
+	uniqueMac("tempRssi","mac",rssiName);
 	for (auto i:rssiName)
 	{
 		vector<rssiData> rssi;
 		matchResult resSingle;
+		cout<<i<<endl;
 		rssiDataGet("tempRssi",i,rssi);
+		cout<<rssi.size()<<endl;
 		singleMatch(cam,rssi,resSingle);
 		res.push_back(resSingle);
 	}
@@ -418,6 +420,7 @@ void syscMySQL::matchProcess(const char *srcCamTable,const char *srcRssiTable,co
 	dropTable("tempRssi");
 }
 
+
 // bool syscMySQL::resultSort(const matchResult &r1,const matchResult &r2)
 // {
 // 	return r1.score<r2.score;
@@ -426,6 +429,8 @@ void syscMySQL::matchProcess(const char *srcCamTable,const char *srcRssiTable,co
 //因为在记录过程中已经将信息优化为一秒，所以一秒对应多个的问题
 void syscMySQL::singleMatch(vector<camData> &src1,vector<rssiData> &src2,matchResult &result)//匹配过程的关键，一定要取两个数据的交集
 {
+	cout<<"camsize"<<src1.size()<<endl;
+	cout<<"rssisize"<<src2.size()<<endl;
 	//默认在存储时，元素已经是拍好序的   所以其匹配速度为O(n)
 	//默认camData是一直有值的，不存在某时刻有rssi值没有cam值，则交集就是src2本身
 	//如果实际中，camData没有数据，则数据可能需要先取交集。
@@ -475,10 +480,10 @@ void syscMySQL::singleMatch(vector<camData> &src1,vector<rssiData> &src2,matchRe
 		}	
 	}
 	//上述的的四个特征已经被筛选出来了，计算表格中数据的特征值,找出非零的特征 此时的输出值已经是0 1 0.3
-	vector<int> diff0=minusFeatureTran(rssiFeatureTran(rssi0,3),camFeatureTran(cam0,10));
-	vector<int> diff1=minusFeatureTran(rssiFeatureTran(rssi1,3),camFeatureTran(cam1,10));
-	vector<int> diff2=minusFeatureTran(rssiFeatureTran(rssi2,3),camFeatureTran(cam2,10));
-	vector<int> diff3=minusFeatureTran(rssiFeatureTran(rssi3,3),camFeatureTran(cam3,10));
+	vector<int> diff0=minusFeatureTran(rssiFeatureTran(rssi0,3),camFeatureTran(cam0,50));
+	vector<int> diff1=minusFeatureTran(rssiFeatureTran(rssi1,3),camFeatureTran(cam1,50));
+	vector<int> diff2=minusFeatureTran(rssiFeatureTran(rssi2,3),camFeatureTran(cam2,50));
+	vector<int> diff3=minusFeatureTran(rssiFeatureTran(rssi3,3),camFeatureTran(cam3,50));
 	//最后输出分数和特征个数
 	result.macName=src2[0].macName;
 	result.num=diff0.size()+diff1.size()+diff2.size()+diff3.size();

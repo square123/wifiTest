@@ -62,15 +62,15 @@ public:
 	vector<int> camFeatureTran(vector<int> &src,int thd);
 	vector<int> minusFeatureTran(vector<int> &src1,vector<int> &src2);
 	void renewResult(vector<matchResult> &src);
+	void uniqueMac(const char *srcTable,const char *name,vector<string> &uniqueTerm);//找出不重复的元素 这个输出的是string 输出的应该是Mac地址元素
 
 
+private:
 	
 	void selTimeBetween(const char *srcTable,const char *dstTable,const char *timeBegin,const char *timeEnd);//选取一个时间段的函数 涉及到表的操作 这些应该都是先在mysql上的表进行操作，最后才读取数据	
-	void uniqueMac(const char *srcTable,const string name,vector<string> &uniqueTerm);//找出不重复的元素 这个输出的是string 输出的应该是Mac地址元素
 	void rssiDataGet(const char *srcTable,const string name,vector<rssiData> &dst);//读取rssi数据的函数
-	void camDataGet(const char *srcTable,const string name,vector<camData> &dst);//读取cam数据的函数
+	void camDataGet(const char *srcTable,const char* name,vector<camData> &dst);//读取cam数据的函数
 	
-private:
 	string charTo02XStr(unsigned char input);//将char类型转换成02X字符串型
 	string macToString(unsigned char Mymac[6]);//完成将char类型转换成字符串
 	string timeToStrng(char timeData[14]);//time转string 函数

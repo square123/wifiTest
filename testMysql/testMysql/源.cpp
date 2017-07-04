@@ -15,13 +15,14 @@ using namespace std;
 
 int main() {  
 	syscMySQL test;//测试包括每个函数的测试
-	//test.camTabCre("camtest");
+// 	test.camTabCre("camtest");
+// 	test.rssiTabCre("rssitest");
 	//test.dropTable("camtest");
 	//vector<vector<string>> xx;
 
 	//test.camTabCre("xx");
-	vector<syscMySQL::camData> xxx;
- 	test.camDataGet("xx","0",xxx);
+// 	vector<syscMySQL::camData> xxx;
+//  	test.camDataGet("xx","0",xxx);
 
 	//cout<<xx[5][1]<<endl;
 // 	char Timestamp[14]={50,50,50,50,50,50,50,50,50,50,50,50,50,50};
@@ -30,7 +31,24 @@ int main() {
 // 	test.insertRssiData("rssitest",Timestamp,Mumac,Rssi);
 	//test.insertCamData("camtest","11111111111111",1,1.0,2.0,3.0,4.0);
 
+	vector<syscMySQL::matchResult> x;
+	test.matchProcess("camtest","rssitest","2","20170426143914","20170426144147",x);
 
+// 	vector<string> x;
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	x.push_back("xx");
+// 	for (auto i:x)
+// 	{
+// 		cout<<sizeof(i)<<endl;
+// 	}
+// 	vector<string> rssiName;
+// 	test.uniqueMac("tempRssi","mac",rssiName);
 
 	system("pause");  
 	return 0;  
