@@ -165,12 +165,13 @@ void ViBeHue::operator()(Mat &image, Mat &fgmask)//要求输入的矩阵是彩色的矩阵
 	//获得vibe的基本矩阵
 	Mat tempMat;
 	testAndUpdate(imageGray);
-	fgmask = getMask();
-	/*imshow("ooo",tempMat);*/
+	tempMat = getMask();
+	imshow("ooo",tempMat);
 	//预处理部分(还需要再完善)
-	//Mat smoothMat;
-//	deNoise(tempMat,smoothMat);
-//	imshow("ori",smoothMat);
+ 	Mat smoothMat;
+ 	deNoise(tempMat,fgmask);
+
+/* 	imshow("ori",fgmask);*/
 
 //     //hue处理
 // 	Mat diffHue,hueSmooth,diffGray,graySmooth;
@@ -178,7 +179,7 @@ void ViBeHue::operator()(Mat &image, Mat &fgmask)//要求输入的矩阵是彩色的矩阵
 // 	absdiff(imageGray,oriImgGray,diffGray);
 	//threshold(diffHue,hueSmooth,20,255,THRESH_BINARY);//将hue的差截断处理
 	//threshold(diffGray&smoothMat,graySmooth,20,255,THRESH_BINARY);//将hue的差截断处理
-	//Mat normMat;
+	/*Mat normMat;*/
 	//normalize(diffGray&smoothMat,normMat,1.0,0.1,NORM_MINMAX); //归一化函数
 	
 

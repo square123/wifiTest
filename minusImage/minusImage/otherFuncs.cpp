@@ -3,7 +3,7 @@
 Mat element3=getStructuringElement(MORPH_ELLIPSE,Size(3,3));
 Mat element5=getStructuringElement(MORPH_ELLIPSE,Size(5,5));
 Mat element7=getStructuringElement(MORPH_ELLIPSE,Size(7,7));
-Mat elementL=getStructuringElement(MORPH_RECT,Size(1,5));
+Mat elementL=getStructuringElement(MORPH_RECT,Size(1,7));
 
 void fillHole(const Mat srcBw, Mat &dstBw)//参考网上的填充函数，很巧妙
 {
@@ -72,14 +72,14 @@ void deNoise(Mat &src,Mat &dst)//要根据参数进行调整，对于大块图像要进行分割。
 	
 	Mat tempMat;
 	//先用开运算处理,去除细小噪点  对于人物较小的只能用小的噪点来处理
-	erode(src,src,element7);
-	dilate(src,src,element7);
+	erode(src,src,element3);
+	dilate(src,src,element3);
 	fillHole(src,tempMat);
 	//先用开运算处理,去除细小噪点
 	dilate(tempMat,tempMat,elementL);
 	erode(tempMat,tempMat,elementL);
-	erode(src,src,element7);
-	dilate(src,src,element7);
-	Mat tempMat2;
+// 	erode(src,src,element7);
+// 	dilate(src,src,element7);
+	//Mat tempMat2;
 	fillHole(tempMat,dst);
 }
