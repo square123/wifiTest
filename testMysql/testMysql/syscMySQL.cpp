@@ -102,10 +102,7 @@ void syscMySQL::dropTable(const char *tableName)
 	sqlstr = "DROP TABLE ";  
 	sqlstr+=tableName;
 	sqlstr+=";";
-	if (0 == mysql_query(&mydata, sqlstr.c_str())) {  
-		cout << "mysql_query() drop table succeed" << endl;  
-	}  
-	else {  
+	if (0 != mysql_query(&mydata, sqlstr.c_str())) {  
 		cout << "mysql_query() drop table failed" << endl;  
 		mysql_close(&mydata);  
 	} 
@@ -128,10 +125,7 @@ void syscMySQL::insertRssiData(const char *tableName,char Timestamp[14],unsigned
 	sqlstr+=" ,";
 	sqlstr+=charToString(Rssi[3]);
 	sqlstr+=");";
-	if (0 == mysql_query(&mydata, sqlstr.c_str())) {  
-		cout << "mysql_query() insert data succeed" << endl;  
-	}  
-	else {  
+	if (0 != mysql_query(&mydata, sqlstr.c_str())) {   
 		cout << "mysql_query() insert data failed" << endl;  
 		mysql_close(&mydata);  
 	}  
@@ -154,10 +148,7 @@ void syscMySQL::insertCamData(const char *tableName,const char *time,int name,do
 	sqlstr+=" ,";
 	sqlstr+=doubleToString(d4);
 	sqlstr+=");";
-	if (0 == mysql_query(&mydata, sqlstr.c_str())) {  
-		cout << "mysql_query() insert data succeed" << endl;  
-	}  
-	else {  
+	if (0 != mysql_query(&mydata, sqlstr.c_str())) {   
 		cout << "mysql_query() insert data failed" << endl;  
 		mysql_close(&mydata);  
 	}  
@@ -406,16 +397,16 @@ void syscMySQL::matchProcess(const char *srcCamTable,const char *srcRssiTable,co
 	{
 		vector<rssiData> rssi;
 		matchResult resSingle;
-		cout<<i<<endl;
+		//cout<<i<<endl;
 		rssiDataGet("tempRssi",i,rssi);
-		cout<<rssi.size()<<endl;
+		//cout<<rssi.size()<<endl;
 		singleMatch(cam,rssi,resSingle);
 		res.push_back(resSingle);
 	}
 	//对匹配的结果分数进行更新
-	renewResult(res);
+	renewResult(res); //需要进行测试
 	//排序
-	sort(res.begin(),res.end(),[](const matchResult &r1,const matchResult &r2){return r1.score<r2.score;});
+	sort(res.begin(),res.end(),[](const matchResult &r1,const matchResult &r2){return r2.score<r1.score;});
 	dropTable("tempCam");
 	dropTable("tempRssi");
 }
@@ -429,15 +420,16 @@ void syscMySQL::matchProcess(const char *srcCamTable,const char *srcRssiTable,co
 //因为在记录过程中已经将信息优化为一秒，所以一秒对应多个的问题
 void syscMySQL::singleMatch(vector<camData> &src1,vector<rssiData> &src2,matchResult &result)//匹配过程的关键，一定要取两个数据的交集
 {
-	cout<<"camsize"<<src1.size()<<endl;
-	cout<<"rssisize"<<src2.size()<<endl;
+	//cout<<"camsize"<<src1.size()<<endl; //这个部分要好好修改下
+	//cout<<"rssisize"<<src2.size()<<endl; 
 	//默认在存储时，元素已经是拍好序的   所以其匹配速度为O(n)
 	//默认camData是一直有值的，不存在某时刻有rssi值没有cam值，则交集就是src2本身
 	//如果实际中，camData没有数据，则数据可能需要先取交集。
 	vector<camData> tempCam;//camData 需要有一个存储的过程，所以不能改变其变量
+	vector<rssiData> tempRssi;
 	auto it1=src1.begin();
 	auto it2=src2.begin();
-	while (it1!=src1.end()&&it2!=src2.end())//这么写是为了以防万一，万一默认数据这里不对也需要修改
+	while (it2!=src2.end()&&it1!=src1.end())//这么写是为了以防万一，万一默认数据这里不对也需要修改 //为了稳定性，将RSSI也定义为中间变量
 	{
 		if (it1->time < it2->time)
 		{
@@ -448,35 +440,37 @@ void syscMySQL::singleMatch(vector<camData> &src1,vector<rssiData> &src2,matchRe
 		}else
 		{
 			tempCam.push_back(*it1);
+			tempRssi.push_back(*it2); //保证两个变量大小是一样的
 			it1++;
 			it2++;
 		}
 	}
+	//cout<<tempCam.size()<<endl;
 	//觉得用动态数组不够好，而且存在很多的冗余，直接采用vector进行计算
 	vector<int> rssi1,rssi2,rssi3,rssi0; 
 	vector<int> cam1,cam2,cam3,cam0;
-	for (int ind=0;ind<tempCam.size();++ind) //通过该操作，此时已经一一对应
+	for (int ind=0;ind<tempCam.size();++ind) //通过该操作，此时已经一一对应，无需再考虑时间的问题
 	{
-		//按照对应存在的位置将cam也存进来
+		//按照rssi对应存在的位置将cam也存进来
 		if (src2[ind].rssi[0]!=0)
 		{
-			rssi0.push_back(src2[ind].rssi[0]);
-			cam0.push_back(src1[ind].dis[0]);
+			rssi0.push_back(tempRssi[ind].rssi[0]);
+			cam0.push_back(tempCam[ind].dis[0]);
 		}
 		if (src2[ind].rssi[1]!=0)
 		{
-			rssi1.push_back(src2[ind].rssi[1]);
-			cam1.push_back(src1[ind].dis[1]);
+			rssi1.push_back(tempRssi[ind].rssi[1]);
+			cam1.push_back(tempCam[ind].dis[1]);
 		}
 		if (src2[ind].rssi[2]!=0)
 		{
-			rssi2.push_back(src2[ind].rssi[2]);
-			cam2.push_back(src1[ind].dis[2]);
+			rssi2.push_back(tempRssi[ind].rssi[2]);
+			cam2.push_back(tempCam[ind].dis[2]);
 		}
 		if (src2[ind].rssi[3]!=0)
 		{
-			rssi3.push_back(src2[ind].rssi[3]);
-			cam3.push_back(src1[ind].dis[3]);
+			rssi3.push_back(tempRssi[ind].rssi[3]);
+			cam3.push_back(tempCam[ind].dis[3]);
 		}	
 	}
 	//上述的的四个特征已经被筛选出来了，计算表格中数据的特征值,找出非零的特征 此时的输出值已经是0 1 0.3
@@ -487,25 +481,28 @@ void syscMySQL::singleMatch(vector<camData> &src1,vector<rssiData> &src2,matchRe
 	//最后输出分数和特征个数
 	result.macName=src2[0].macName;
 	result.num=diff0.size()+diff1.size()+diff2.size()+diff3.size();
-	result.score=double(accumulate(diff0.begin(),diff0.end(),accumulate(diff2.begin(),diff2.end(),0))+accumulate(diff1.begin(),diff1.end(),accumulate(diff3.begin(),diff3.end(),0)))/result.num*100;
+	result.score=result.num==0?0:double(accumulate(diff0.begin(),diff0.end(),accumulate(diff2.begin(),diff2.end(),0))+accumulate(diff1.begin(),diff1.end(),accumulate(diff3.begin(),diff3.end(),0)))/result.num*100;
 }
 
 vector<int> syscMySQL::rssiFeatureTran(vector<int> &src,int thd)
 {
-	vector<int> result;
-	for (auto it=src.begin();it!=src.end()-1;it++)
+	vector<int> result;//应该加入判断
+	if (src.size()!=0)
 	{
-		if ((*(it+1)-(*it))>thd)
+		for (auto it=src.begin();it!=src.end()-1;it++)
 		{
-			result.push_back(1);//rssi值变大记为1
-		}
-		else if ((*(it)-(*it+1))>thd)
-		{
-			result.push_back(-1);//rssi值变小记为-1
-		}
-		else
-		{
-			result.push_back(0);//不变记为0
+			if ((*(it+1)-(*it))>thd)
+			{
+				result.push_back(1);//rssi值变大记为1
+			}
+			else if (((*it)-(*it+1))>thd)
+			{
+				result.push_back(-1);//rssi值变小记为-1
+			}
+			else
+			{
+				result.push_back(0);//不变记为0
+			}
 		}
 	}
 	return result;
@@ -514,19 +511,22 @@ vector<int> syscMySQL::rssiFeatureTran(vector<int> &src,int thd)
 vector<int> syscMySQL::camFeatureTran(vector<int> &src,int thd)
 {
 	vector<int> result;
-	for (auto it=src.begin();it!=src.end()-1;it++)
+	if (src.size()!=0)
 	{
-		if ((*(it+1)-(*it))>thd)
+		for (auto it=src.begin();it!=src.end()-1;it++)
 		{
-			result.push_back(-1);//距离变大记为-1
-		}
-		else if ((*(it)-(*it+1))>thd)
-		{
-			result.push_back(1);//距离变小记为1
-		}
-		else
-		{
-			result.push_back(0);//不变记为0
+			if ((*(it+1)-(*it))>thd)
+			{
+				result.push_back(-1);//距离变大记为-1
+			}
+			else if (((*it)-(*it+1))>thd)
+			{
+				result.push_back(1);//距离变小记为1
+			}
+			else
+			{
+				result.push_back(0);//不变记为0
+			}
 		}
 	}
 	return result;
@@ -561,7 +561,7 @@ vector<int> syscMySQL::minusFeatureTran(vector<int> &src1,vector<int> &src2)
 void syscMySQL::renewResult(vector<matchResult> &src)//重新根据数量再对分数进行修改
 {
 	//返回最大数的位置
-	auto maxEle=max_element(src.begin(),src.end(),[](const matchResult &r1,const matchResult &r2){return r1.score<r2.score;});
+	auto maxEle=max_element(src.begin(),src.end(),[](const matchResult &r1,const matchResult &r2){return r1.num<r2.num;});
 	//sigmoid函数
 	double b=0.5*((*maxEle).num);
 	double a=15.3170/((*maxEle).num);
