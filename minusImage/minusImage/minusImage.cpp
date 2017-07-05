@@ -37,13 +37,13 @@ void minusImage::operator()(Mat &image, Mat &fgmask)
 	absdiff(ImgGray,oriImgGray,diffGray);
 	threshold(diffGray,dwMatRaw,5,255,THRESH_TOZERO);//将阈值以下的数据抹平
 	threshold(dwMatRaw,dwOstuMat,0,255,THRESH_OTSU);//ostu法
-	imshow("step1",dwOstuMat);
+	//imshow("step1",dwOstuMat);
 
 	//step2 在hue中做差
 	Mat hueSmooth;
 	absdiff(imgSplit.at(0),orisplit.at(0),diffHue);
 	threshold(diffHue,hueSmooth,30,255,THRESH_BINARY);
-	imshow("step2",diffHue);
+	//imshow("step2",diffHue);
 
 	Mat zong,ozong;
 	addWeighted(hueSmooth&dwOstuMat,0.2,dwOstuMat&diffGray,0.8,0,zong);

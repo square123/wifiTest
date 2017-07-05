@@ -1,6 +1,8 @@
 #include "otherFuncs.h"
 
-Mat element=getStructuringElement(MORPH_ELLIPSE,Size(3,3));
+Mat element3=getStructuringElement(MORPH_ELLIPSE,Size(3,3));
+Mat element5=getStructuringElement(MORPH_ELLIPSE,Size(5,5));
+Mat element7=getStructuringElement(MORPH_ELLIPSE,Size(7,7));
 Mat elementL=getStructuringElement(MORPH_RECT,Size(1,5));
 
 void fillHole(const Mat srcBw, Mat &dstBw)//参考网上的填充函数，很巧妙
@@ -65,16 +67,19 @@ void hullArea(Mat &src,Mat &dst)
 	}
 }
 
-void deNoise(Mat &src,Mat &dst)//该函数有问题 要修改
+void deNoise(Mat &src,Mat &dst)//要根据参数进行调整，对于大块图像要进行分割。
 {
-	//先用开运算处理,去除细小噪点
+	
 	Mat tempMat;
-
-	erode(src,src,element);
-	dilate(src,src,element);
+	//先用开运算处理,去除细小噪点  对于人物较小的只能用小的噪点来处理
+	erode(src,src,element7);
+	dilate(src,src,element7);
 	fillHole(src,tempMat);
-
-	//dilate(tempMat,tempMat,elementL);
+	//先用开运算处理,去除细小噪点
+	dilate(tempMat,tempMat,elementL);
+	erode(tempMat,tempMat,elementL);
+	erode(src,src,element7);
+	dilate(src,src,element7);
 	Mat tempMat2;
 	fillHole(tempMat,dst);
 }

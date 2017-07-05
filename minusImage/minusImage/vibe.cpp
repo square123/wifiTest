@@ -6,7 +6,7 @@ using namespace cv;
 int c_xoff[9] = {-1,  0,  1, -1, 1, -1, 0, 1, 0};  //x的邻居点
 int c_yoff[9] = {-1,  0,  1, -1, 1, -1, 0, 1, 0};  //y的邻居点
 
-ViBeHue::ViBeHue(Mat &src)
+ViBeHue::ViBeHue(Mat &src) //在构造函数中应该加入是否进行hue的选项。 
 {
 	if (src.channels()!=3)
 	{
@@ -165,12 +165,25 @@ void ViBeHue::operator()(Mat &image, Mat &fgmask)//要求输入的矩阵是彩色的矩阵
 	//获得vibe的基本矩阵
 	Mat tempMat;
 	testAndUpdate(imageGray);
-	tempMat = getMask();
+	fgmask = getMask();
+	/*imshow("ooo",tempMat);*/
+	//预处理部分(还需要再完善)
+	//Mat smoothMat;
+//	deNoise(tempMat,smoothMat);
+//	imshow("ori",smoothMat);
 
-	//预处理部分
-	Mat smoothMat;
-	deNoise(tempMat,fgmask);
+//     //hue处理
+// 	Mat diffHue,hueSmooth,diffGray,graySmooth;
+// 	absdiff(imageSplit.at(0),orisplit.at(0),diffHue);
+// 	absdiff(imageGray,oriImgGray,diffGray);
+	//threshold(diffHue,hueSmooth,20,255,THRESH_BINARY);//将hue的差截断处理
+	//threshold(diffGray&smoothMat,graySmooth,20,255,THRESH_BINARY);//将hue的差截断处理
+	//Mat normMat;
+	//normalize(diffGray&smoothMat,normMat,1.0,0.1,NORM_MINMAX); //归一化函数
+	
 
-
-//将hue与合并	
+	//将hue与vibe合并	
+// 	Mat hueAndVibe,hueAndVibeEd;
+// 	addWeighted(diffHue&smoothMat,0.4,diffGray&smoothMat,0.6,0,hueAndVibe);
+// 	threshold(hueAndVibe,fgmask,0,255,THRESH_OTSU);
 }
